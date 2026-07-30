@@ -304,7 +304,7 @@
    ITN Household Registration — HHR app
    HHR01 … HHR100 · 10 days · 25 households per day
    ========================================================= */
-const APP_VERSION='2026.07.30k';
+const APP_VERSION='2026.07.30l';
 
 /* =========================================================
    BACKEND — the deployed submission endpoint. It is baked in, so a
@@ -968,6 +968,7 @@ function drawMap(pts){
    25 HOUSEHOLD CARDS FOR ONE DAY
    ========================================================= */
 function renderDay(d){
+  gpsStop();
   if(!dayOpen(d)){ renderDays(); return; }
   const nx=nextHH(d);
   let tiles='';
@@ -1120,27 +1121,115 @@ let form={}, formD=0, formH=0, showErr=false, editing=false;
    by the time the token has been written and submission reaches the GPS step it
    is almost always already captured. It stays LAST in the flow — nothing is
    saved before it — but the wait moves off the end of the interview. */
-let gpsFix=null, gpsState='idle', gpsErr='';
+let gpsFix=null, gpsState='idle', gpsErr='', gpsHint='';
+let gpsWatch=null, gpsT0=0, gpsTick=null, gpsQuick=false;
+const GPS_GOOD=25;        /* metres: accurate enough to stop chasing a better one */
+const GPS_BUDGET=60000;   /* keep trying to improve for this long, then settle */
+
+/* Why a fix might be impossible before we even ask. The https one matters:
+   browsers refuse geolocation on a page that is not in a secure context, which
+   is what happens when the file is opened from a download instead of its
+   web address — and the failure looks exactly like a bad GPS signal. */
+function gpsSupportProblem(){
+  if(!navigator.geolocation) return 'This browser has no location support.';
+  if(window.isSecureContext===false)
+    return 'The browser blocks location on a page that is not https. Open the app from its web address, not from a downloaded copy of the file.';
+  return '';
+}
+function gpsStop(){
+  if(gpsWatch!=null&&navigator.geolocation&&navigator.geolocation.clearWatch){
+    try{ navigator.geolocation.clearWatch(gpsWatch); }catch(e){}
+  }
+  gpsWatch=null;
+  if(gpsTick){ clearInterval(gpsTick); gpsTick=null; }
+}
+function gpsSecs(){ return gpsT0?Math.round((Date.now()-gpsT0)/1000):0; }
+
+/* Two attempts run together, because one alone is what makes this hard in the
+   field: a quick coarse fix so there is something within a second or two, and
+   a watch on the real GPS that keeps replacing it with a better one. The best
+   reading wins. We stop as soon as it is accurate enough, or when the time
+   budget runs out. */
 function beginGps(){
   if(editing) return;
-  if(!navigator.geolocation){ gpsState='fail'; gpsErr='This device has no GPS.'; paintGps(); return; }
-  gpsFix=null; gpsState='getting'; gpsErr=''; paintGps();
+  gpsStop();
+  const problem=gpsSupportProblem();
+  if(problem){ gpsState='fail'; gpsErr=problem; gpsHint=''; paintGps(); return; }
+  gpsFix=null; gpsState='getting'; gpsErr=''; gpsHint=''; gpsT0=Date.now(); gpsQuick=false;
+  paintGps();
+
+  /* 1 — fast and rough: happy with a cached or network-derived position */
   navigator.geolocation.getCurrentPosition(
-    p=>{ gpsFix={lat:+p.coords.latitude.toFixed(6), lng:+p.coords.longitude.toFixed(6),
-                 acc:Math.round(p.coords.accuracy||0), at:new Date().toISOString()};
-         gpsState='ok'; paintGps(); },
-    e=>{ gpsState='fail';
-         gpsErr=(e&&e.code===1)?'Location permission was refused.':'GPS could not get a fix.';
-         paintGps(); },
-    {enableHighAccuracy:true, timeout:25000, maximumAge:0});
+    p=>{ gpsQuick=true; gpsTake(p); },
+    ()=>{},                                  /* its failure is not fatal, the watch continues */
+    {enableHighAccuracy:false, timeout:15000, maximumAge:120000});
+
+  /* 2 — the real thing, reporting repeatedly as the fix sharpens */
+  try{
+    gpsWatch=navigator.geolocation.watchPosition(
+      p=>gpsTake(p),
+      e=>gpsProblem(e),
+      {enableHighAccuracy:true, timeout:45000, maximumAge:0});
+  }catch(e){
+    navigator.geolocation.getCurrentPosition(p=>gpsTake(p),e2=>gpsProblem(e2),
+      {enableHighAccuracy:true, timeout:45000, maximumAge:0});
+  }
+
+  /* the card counts up while it searches, so a long wait looks like progress
+     rather than a hang */
+  gpsTick=setInterval(()=>{
+    if(gpsState==='getting'||(gpsState==='ok'&&gpsWatch!=null)) paintGps();
+    if(gpsT0&&Date.now()-gpsT0>GPS_BUDGET){
+      if(gpsFix) gpsStop();
+      else if(gpsState==='getting'){
+        gpsState='fail';
+        gpsErr='No location after '+Math.round(GPS_BUDGET/1000)+' seconds.';
+        gpsHint='Step into the open, away from walls and roofs, and try again.';
+        gpsStop();
+      }
+      paintGps();
+    }
+  },1000);
+}
+function gpsTake(p){
+  if(!p||!p.coords) return;
+  const f={lat:+p.coords.latitude.toFixed(6), lng:+p.coords.longitude.toFixed(6),
+           acc:Math.round(p.coords.accuracy||0), at:new Date().toISOString()};
+  if(!gpsFix||f.acc<=gpsFix.acc) gpsFix=f;      /* keep the sharpest reading */
+  gpsState='ok'; gpsErr=''; gpsHint='';
+  if(gpsFix.acc<=GPS_GOOD||Date.now()-gpsT0>GPS_BUDGET) gpsStop();
+  paintGps();
+}
+function gpsProblem(e){
+  if(gpsFix){ gpsStop(); return; }             /* already have a point — ignore */
+  const code=e&&e.code;
+  gpsState='fail';
+  if(code===1){
+    gpsErr='Location permission was refused.';
+    gpsHint='Allow location for this site in the browser, then try again. On Android it is the padlock or the (i) beside the address, then Permissions. Check location is also on in the phone settings.';
+  } else if(code===2){
+    gpsErr='The device cannot work out where it is.';
+    gpsHint='Turn location on in the phone settings, step into the open, and try again. Indoors it often fails.';
+  } else {
+    gpsErr='Location is taking too long.';
+    gpsHint='Step into the open, away from walls and roofs, and try again.';
+  }
+  gpsStop(); paintGps();
 }
 function gpsCard(){
+  const secs=gpsSecs();
   const body =
-    gpsState==='ok'   ? `<div class="gps-ok">Captured \u00b7 ${gpsFix.lat}, ${gpsFix.lng} (\u00b1${gpsFix.acc} m)</div>`
-  : gpsState==='fail' ? `<div class="err">${esc(gpsErr)} It is needed before this household can be registered.</div>
-                         <button class="btn btn-ghost btn-block btn-sm" style="margin-top:9px" onclick="beginGps()">Try again</button>`
-  :                     `<div class="sync-bar wait" style="margin:0"><span class="d"></span>
-                          <div class="t">Taking the GPS point while you work \u2014 it will be ready by the time you submit.</div></div>`;
+    gpsState==='ok'
+      ? `<div class="gps-ok">Captured \u00b7 ${gpsFix.lat}, ${gpsFix.lng} (\u00b1${gpsFix.acc} m)</div>
+         ${gpsWatch!=null?`<div class="q-help" style="margin:8px 0 0">Still sharpening the point \u2014 you can carry on, the best reading is kept.</div>`:''}
+         ${gpsFix.acc>GPS_GOOD&&gpsWatch==null?`<div class="q-help" style="margin:8px 0 0">\u00b1${gpsFix.acc} m is rough. Fine to submit, or <b>try again</b> in the open for a tighter point.</div>
+           <button class="btn btn-ghost btn-block btn-sm" style="margin-top:9px" onclick="beginGps()">Try again</button>`:''}`
+  : gpsState==='fail'
+      ? `<div class="err">${esc(gpsErr)} A point is needed before this household can be registered.</div>
+         ${gpsHint?`<div class="q-help" style="margin:8px 0 0">${esc(gpsHint)}</div>`:''}
+         <button class="btn btn-primary btn-block btn-sm" style="margin-top:9px" onclick="beginGps()">Try again</button>`
+  :       `<div class="sync-bar wait" style="margin:0"><span class="d"></span>
+            <div class="t">Looking for the location\u2026 ${secs}s. Carry on with the questions \u2014 it keeps searching in the background.</div></div>`;
   return `<div class="q-card" id="qc_gps">
     <span class="q-no">GPS</span>
     <div class="q-txt">Location of the household</div>
@@ -1154,7 +1243,7 @@ function openHH(d,h){
   formD=d; formH=h; showErr=false; editing=false;
   form=Object.assign({},recGet(d,h));
   if(!form.hhrPhone) form.hhrPhone=Store.get('itn_hhr_phone_'+me,'');
-  if(isDone(d,h)){ gpsFix=null; gpsState='idle'; renderSaved(); return; }
+  if(isDone(d,h)){ gpsStop(); gpsFix=null; gpsState='idle'; renderSaved(); return; }
   renderForm();
   beginGps();          /* start the fix now, not at the end */
 }
@@ -1313,7 +1402,7 @@ function gpsStep(){
      the registrar may well have moved outside since */
   if(gpsState!=='getting') beginGps();
   modal(`<h3>Waiting for the GPS point</h3><div class="spin"></div>
-    <p style="text-align:center">Everything else is ready. Hold still \u2014 the household is saved as soon as the point comes in.</p>`);
+    <p style="text-align:center" id="gpsWait">Everything else is ready. Step into the open if you can \u2014 the household is saved the moment a point comes in.</p>`);
   const t0=Date.now();
   const tick=()=>{
     if(gpsState==='ok'&&gpsFix){ finish(gpsFix); return; }
@@ -1350,7 +1439,7 @@ function finish(gps){
   if(rec.hhrPhone) Store.set('itn_hhr_phone_'+me,rec.hhrPhone);
   recSet(d,h,rec);
   setDone(d,h,true);
-  gpsFix=null; gpsState='idle';
+  gpsStop(); gpsFix=null; gpsState='idle';
   closeModal();
   savedModal(rec,'sending');
   /* each household goes up on its own, as soon as it is registered */
