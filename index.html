@@ -1,0 +1,1274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ITN Household Registration</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<meta name="theme-color" content="#1b6499">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="ITN HHR">
+<style>
+  :root{
+    --sky-50:#f2f8fd; --sky-100:#e3f1fb; --sky-200:#c9e4f7; --sky-300:#9ed0f0;
+    --sky-400:#6ab6e6; --sky-500:#3d9ad6; --sky-600:#2680bd; --sky-700:#1b6499;
+    --ink:#14344d; --muted:#5f7f96; --line:#dceaf5; --white:#fff;
+    --ok:#2aa17c; --ok-bg:#e6f6f1; --bad:#d95468; --bad-bg:#fceaed;
+    --warn:#e0a100; --warn-bg:#fff7e0;
+    --sh-sm:0 2px 8px rgba(38,128,189,.08);
+    --sh-md:0 10px 30px rgba(38,128,189,.14);
+    --sh-lg:0 26px 60px rgba(38,128,189,.22);
+    --disp:'Oswald',system-ui,sans-serif; --body:'Inter',-apple-system,'Segoe UI',Roboto,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+  html,body{height:100%;}
+  body{font-family:var(--body);color:var(--ink);background:var(--sky-50);display:flex;align-items:center;justify-content:center;padding:20px;}
+  .phone{width:410px;max-width:100%;height:880px;max-height:96vh;background:#0c2740;border-radius:46px;padding:12px;box-shadow:var(--sh-lg);}
+  .screen{position:relative;width:100%;height:100%;background:var(--white);border-radius:36px;overflow:hidden;}
+  #app{position:absolute;inset:0;display:flex;flex-direction:column;}
+  @media (max-width:540px){body{padding:0;}.phone{width:100%;height:100vh;max-height:none;border-radius:0;padding:0;}.screen{border-radius:0;}}
+
+  .appbar{flex:0 0 auto;background:var(--sky-100);color:var(--sky-700);padding:15px 16px 13px;display:flex;align-items:center;gap:11px;border-bottom:1px solid var(--sky-200);}
+  @supports (padding-top: env(safe-area-inset-top)){
+    .appbar{padding-top:calc(15px + env(safe-area-inset-top));}
+    .footer{padding-bottom:calc(13px + env(safe-area-inset-bottom));}
+  }
+  .ico-btn{width:38px;height:38px;border:none;border-radius:12px;background:var(--white);color:var(--sky-600);display:grid;place-items:center;cursor:pointer;box-shadow:var(--sh-sm);flex:0 0 auto;}
+  .ico-btn:active{transform:scale(.94);}
+  .titles{min-width:0;flex:1;}
+  .eyebrow{font:600 10px/1 var(--body);letter-spacing:.15em;text-transform:uppercase;color:var(--sky-500);}
+  .title{font:600 16.5px/1.15 var(--disp);letter-spacing:.02em;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .tag-pill{font:700 9.5px/1 var(--body);letter-spacing:.06em;padding:6px 8px;border-radius:7px;flex:0 0 auto;}
+  .tag-pill.me{background:var(--sky-600);color:#fff;}
+
+  .body{flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+  .footer{flex:0 0 auto;background:var(--sky-100);border-top:1px solid var(--sky-200);padding:13px 16px calc(15px + env(safe-area-inset-bottom));display:flex;gap:10px;}
+
+  .btn{font:600 15px/1 var(--body);border:none;border-radius:14px;padding:15px 18px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;transition:transform .08s,box-shadow .2s;}
+  .btn:active{transform:translateY(1px);}
+  .btn-primary{background:var(--sky-600);color:#fff;box-shadow:0 6px 16px rgba(38,128,189,.3);flex:1;}
+  .btn-primary:disabled{background:var(--sky-200);color:#fff;box-shadow:none;cursor:not-allowed;}
+  .btn-ghost{background:var(--white);color:var(--sky-600);box-shadow:var(--sh-sm);}
+  .btn-ok{background:var(--ok);color:#fff;box-shadow:0 6px 16px rgba(42,161,124,.28);flex:1;}
+  .btn-danger{background:var(--bad-bg);color:var(--bad);box-shadow:none;}
+  .btn-block{width:100%;}
+  .btn-sm{padding:12px 14px;font-size:13.5px;}
+
+  .hero{background:linear-gradient(160deg,var(--sky-500),var(--sky-700));color:#fff;padding:26px 22px 30px;border-bottom-left-radius:30px;border-bottom-right-radius:30px;position:relative;overflow:hidden;}
+  .hero::after{content:"";position:absolute;right:-60px;top:-70px;width:210px;height:210px;border-radius:50%;background:rgba(255,255,255,.10);}
+  .hero h1{font:600 23px/1.18 var(--disp);margin:0 0 8px;position:relative;}
+  .hero p{font:400 12.5px/1.5 var(--body);color:rgba(255,255,255,.9);max-width:32ch;position:relative;}
+
+  .list{padding:18px 16px 28px;}
+  .list h2{font:600 20px/1.1 var(--disp);}
+  .sub{font:400 12px/1.45 var(--body);color:var(--muted);margin:6px 0 14px;}
+  .card{background:var(--white);border:1px solid var(--line);border-radius:16px;padding:15px;margin-bottom:13px;box-shadow:var(--sh-sm);}
+  .field{margin-bottom:11px;}
+  .lbl{font:600 11px var(--body);color:var(--muted);margin-bottom:6px;letter-spacing:.02em;}
+  .field input{width:100%;font:500 15px var(--body);color:var(--ink);padding:13px 14px;border:1.5px solid var(--line);border-radius:12px;background:var(--white);outline:none;transition:.15s;}
+  .field input:focus{border-color:var(--sky-500);box-shadow:0 0 0 3px rgba(61,154,214,.13);}
+  .flag{font:500 11.5px/1.4 var(--body);padding:9px 11px;border-radius:10px;margin-bottom:11px;}
+  .flag.bad{background:var(--bad-bg);color:var(--bad);border:1px solid #f2ccd2;}
+  .flag.ok{background:var(--ok-bg);color:var(--ok);border:1px solid #bfe6d6;}
+  .note{font:400 11.5px/1.5 var(--body);color:var(--sky-700);background:var(--sky-50);border:1px dashed var(--sky-300);border-radius:10px;padding:10px 12px;margin-bottom:13px;}
+
+  /* ---- shared card grid (HHRs, days, households) ---- */
+  .grid{display:grid;gap:10px;}
+  .grid.g2{grid-template-columns:1fr 1fr;}
+  .grid.g3{grid-template-columns:1fr 1fr 1fr;}
+  .grid.g4{grid-template-columns:repeat(4,1fr);}
+
+  .tile{position:relative;background:var(--white);border:1px solid var(--line);border-radius:14px;padding:12px 11px;box-shadow:var(--sh-sm);text-align:left;cursor:pointer;transition:transform .12s,box-shadow .2s,border-color .15s;}
+  .tile:active{transform:scale(.98);}
+  .tile .tn{font:700 14px/1 var(--disp);letter-spacing:.03em;color:var(--ink);}
+  .tile .tb{font:700 8.5px/1 var(--body);letter-spacing:.05em;text-transform:uppercase;padding:5px 6px;border-radius:99px;}
+  .tile .top{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:9px;}
+  .tile .tk{font:500 10px/1.3 var(--body);color:var(--muted);}
+  .tile .ttrack{height:6px;background:var(--sky-50);border:1px solid var(--line);border-radius:99px;overflow:hidden;margin-top:8px;}
+  .tile .tfill{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--sky-400),var(--sky-600));}
+  .tile .tfill.full{background:var(--ok);}
+
+  /* state colours: green = complete, red = not complete, dim red = locked */
+  .tile.done{border-color:var(--ok);background:var(--ok-bg);}
+  .tile.done .tb{background:var(--ok);color:#fff;}
+  .tile.done .tn{color:#16744f;}
+  .tile.todo{border-color:var(--bad);background:var(--bad-bg);}
+  .tile.todo .tb{background:var(--bad);color:#fff;}
+  .tile.todo .tn{color:#a33648;}
+  .tile.next{box-shadow:0 0 0 3px rgba(217,84,104,.18),var(--sh-sm);}
+  .tile.locked{cursor:not-allowed;opacity:.5;}
+  .tile.locked .tb{background:#eef2f5;color:var(--muted);}
+
+  /* square household cards */
+  .hh{aspect-ratio:1/1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:8px;text-align:center;}
+  .hh .hn{font:700 19px/1 var(--disp);letter-spacing:.02em;}
+  .hh .hs{font:700 7.5px/1 var(--body);letter-spacing:.05em;text-transform:uppercase;}
+  .hh.done .hn,.hh.done .hs{color:#16744f;}
+  .hh.todo .hn,.hh.todo .hs{color:#a33648;}
+  .hh.locked .hn,.hh.locked .hs{color:var(--muted);}
+  .hh .pend{position:absolute;top:6px;right:6px;width:7px;height:7px;border-radius:50%;background:var(--warn);
+    box-shadow:0 0 0 2px #fff;}
+
+  .legend{display:flex;gap:14px;flex-wrap:wrap;margin:0 2px 13px;}
+  .legend span{display:inline-flex;align-items:center;gap:6px;font:500 10.5px/1 var(--body);color:var(--muted);}
+  .legend i{width:11px;height:11px;border-radius:4px;border:1px solid;display:inline-block;}
+  .legend i.d{background:var(--ok-bg);border-color:var(--ok);}
+  .legend i.t{background:var(--bad-bg);border-color:var(--bad);}
+  .legend i.l{background:#f1f4f7;border-color:#cfd8e0;}
+
+  .stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-bottom:15px;}
+  .stat{background:var(--white);border:1px solid var(--line);border-radius:15px;padding:14px;box-shadow:var(--sh-sm);}
+  .stat .n{font:700 25px/1 var(--disp);color:var(--sky-600);}
+  .stat .n.g{color:var(--ok);} .stat .n.r{color:var(--bad);}
+  .stat .l{font:500 11px/1.3 var(--body);color:var(--muted);margin-top:6px;}
+
+  .hd-head{background:linear-gradient(160deg,var(--sky-500),var(--sky-700));color:#fff;border-radius:16px;padding:16px;margin-bottom:14px;}
+  .hd-head .id{font:700 20px var(--disp);letter-spacing:.04em;}
+  .hd-head .meta{font:400 11.5px/1.5 var(--body);opacity:.92;margin-top:5px;}
+
+  /* ---- form ---- */
+  .q-card{background:var(--white);border:1px solid var(--line);border-radius:15px;padding:15px;margin-bottom:11px;box-shadow:var(--sh-sm);scroll-margin-top:14px;}
+  .q-card.missing{border-color:var(--bad);box-shadow:0 0 0 3px rgba(217,84,104,.13);}
+  .q-no{display:inline-block;font:700 10px/1 var(--body);letter-spacing:.08em;color:var(--sky-600);background:var(--sky-50);border:1px solid var(--sky-200);padding:5px 8px;border-radius:6px;margin-bottom:9px;}
+  .q-txt{font:500 15px/1.32 var(--body);color:var(--ink);margin-bottom:4px;}
+  .q-txt .req{color:var(--bad);margin-left:2px;}
+  .q-help{font:400 11.5px/1.45 var(--body);color:var(--muted);margin-bottom:10px;}
+  .q-card .q-txt+.opts,.q-card .q-txt+.field{margin-top:11px;}
+  .opts{display:flex;gap:8px;}
+  .opt{flex:1;display:flex;align-items:center;justify-content:center;gap:9px;padding:13px 12px;border:1.5px solid var(--line);border-radius:12px;background:var(--white);cursor:pointer;font:600 14px/1.2 var(--body);color:var(--ink);transition:.13s;}
+  .opt .mark{width:18px;height:18px;border-radius:50%;border:2px solid var(--sky-200);flex:0 0 auto;display:grid;place-items:center;}
+  .opt .mark::after{content:"";width:9px;height:9px;border-radius:50%;background:var(--sky-600);transform:scale(0);transition:transform .15s;}
+  .opt.sel .mark::after{transform:scale(1);}
+  .opt.yes.sel{border-color:var(--ok);background:var(--ok-bg);box-shadow:0 0 0 3px rgba(42,161,124,.12);}
+  .opt.yes.sel .mark{border-color:var(--ok);} .opt.yes.sel .mark::after{background:var(--ok);}
+  .opt.no.sel{border-color:var(--bad);background:var(--bad-bg);box-shadow:0 0 0 3px rgba(217,84,104,.12);}
+  .opt.no.sel .mark{border-color:var(--bad);} .opt.no.sel .mark::after{background:var(--bad);}
+  .field input[readonly]{background:var(--sky-50);font-family:var(--disp);letter-spacing:.05em;color:var(--sky-700);font-size:17px;}
+  .field .calc{font-family:var(--disp);letter-spacing:.04em;color:var(--sky-700);}
+  .unit{position:relative;}
+  .unit .u{position:absolute;right:13px;top:50%;transform:translateY(-50%);font:600 12px var(--body);color:var(--muted);pointer-events:none;}
+  .unit input{padding-right:64px;}
+  .err{font:500 11.5px/1.4 var(--body);color:var(--bad);margin-top:8px;}
+  .tok-show{font:700 26px/1.1 var(--disp);letter-spacing:.06em;color:var(--sky-700);background:var(--sky-50);border:1.5px dashed var(--sky-300);border-radius:12px;padding:14px;text-align:center;word-break:break-all;}
+
+  .rv-item{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--line);}
+  .rv-item:last-child{border-bottom:none;}
+  .rv-item .q{font:400 12px/1.35 var(--body);color:var(--muted);flex:1;}
+  .rv-item .a{font:600 12.5px/1.35 var(--body);color:var(--ink);text-align:right;flex:0 0 46%;word-break:break-word;}
+
+  /* ---- landing menu ---- */
+  .menu-card{position:relative;display:flex;align-items:center;gap:15px;width:100%;text-align:left;
+    background:var(--white);border:1px solid var(--line);border-radius:20px;padding:18px;margin-bottom:13px;
+    cursor:pointer;box-shadow:var(--sh-sm);overflow:hidden;transition:transform .12s,box-shadow .2s;}
+  .menu-card:active{transform:scale(.985);}
+  .menu-card:hover{box-shadow:var(--sh-md);}
+  .menu-card::after{content:"";position:absolute;right:-40px;top:-46px;width:132px;height:132px;border-radius:50%;background:var(--sky-50);}
+  .menu-card .mi{position:relative;width:54px;height:54px;border-radius:17px;display:grid;place-items:center;flex:0 0 auto;}
+  .menu-card .mi.b{background:var(--sky-100);color:var(--sky-600);}
+  .menu-card .mi.g{background:var(--ok-bg);color:var(--ok);}
+  .menu-card .mi.y{background:var(--warn-bg);color:#b8860b;}
+  .menu-card .mt{position:relative;flex:1;min-width:0;}
+  .menu-card .mt h3{font:600 17.5px/1.1 var(--disp);letter-spacing:.01em;margin-bottom:4px;}
+  .menu-card .mt span{font:400 12px/1.45 var(--body);color:var(--muted);display:block;}
+  .menu-card .mt .mm{font:600 10.5px/1 var(--body);letter-spacing:.04em;color:var(--sky-600);margin-top:9px;display:inline-block;
+    background:var(--sky-50);border:1px solid var(--sky-200);border-radius:99px;padding:6px 9px;}
+  .menu-card .ma{position:relative;color:var(--sky-300);flex:0 0 auto;}
+
+  /* ---- movement map ---- */
+  .daybar{display:flex;gap:6px;overflow-x:auto;padding:2px 0 4px;margin-bottom:12px;-webkit-overflow-scrolling:touch;}
+  .daybar button{flex:0 0 auto;border:1.5px solid var(--sky-200);background:var(--white);color:var(--sky-700);
+    border-radius:10px;padding:9px 12px;font:600 12px/1 var(--body);cursor:pointer;}
+  .daybar button.on{background:var(--sky-600);border-color:var(--sky-600);color:#fff;}
+  .daybar button:disabled{opacity:.42;cursor:not-allowed;}
+  #map{height:330px;border-radius:16px;border:1px solid var(--line);overflow:hidden;background:var(--sky-50);box-shadow:var(--sh-sm);}
+  .mk{display:inline-grid;place-items:center;min-width:26px;height:26px;padding:0 7px;border-radius:99px;
+    background:var(--sky-600);color:#fff;font:700 11px/1 'Oswald',sans-serif;letter-spacing:.02em;
+    border:2px solid #fff;box-shadow:0 2px 6px rgba(12,39,64,.35);white-space:nowrap;}
+  .mk.multi{font-size:10px;letter-spacing:.04em;}
+  .mk.first{background:var(--ok);} .mk.last{background:var(--bad);}
+  .step-row .sn.multi{width:auto;min-width:26px;padding:0 6px;border-radius:99px;font-size:9.5px;}
+  .leaflet-container{font-family:var(--body);}
+  .mpop{font:400 12px/1.5 var(--body);}
+  .mpop b{font:600 12.5px var(--body);}
+  .steps{max-height:none;}
+  .step-row{display:flex;align-items:center;gap:11px;padding:9px 0;border-bottom:1px solid var(--line);}
+  .step-row:last-child{border-bottom:none;}
+  .step-row .sn{width:26px;height:26px;border-radius:50%;background:var(--sky-600);color:#fff;
+    display:grid;place-items:center;font:700 11px/1 var(--disp);flex:0 0 auto;}
+  .step-row .sn.first{background:var(--ok);} .step-row .sn.last{background:var(--bad);}
+  .step-row .sm{flex:1;min-width:0;}
+  .step-row .sm .t{font:600 12.5px var(--body);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .step-row .sm .s{font:400 11px var(--body);color:var(--muted);margin-top:2px;}
+  .step-row .sg{font:600 11px var(--body);color:var(--sky-600);flex:0 0 auto;}
+
+  /* ---- target and achievement ---- */
+  .ring-card{background:var(--white);border:1px solid var(--line);border-radius:20px;padding:18px;margin-bottom:13px;box-shadow:var(--sh-sm);
+    display:flex;align-items:center;gap:18px;}
+  .ring-card .rw{flex:0 0 auto;position:relative;width:128px;height:128px;}
+  .ring-card .rl{flex:1;min-width:0;}
+  .ring-card .rl h4{font:600 13px var(--body);margin-bottom:10px;}
+  .ring-txt{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;}
+  .ring-txt .p{font:700 27px/1 var(--disp);color:var(--sky-700);}
+  .ring-txt .s{font:500 10px/1.2 var(--body);color:var(--muted);margin-top:3px;}
+  .kv{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px dashed var(--line);}
+  .kv:last-child{border-bottom:none;}
+  .kv .k{font:400 11.5px var(--body);color:var(--muted);}
+  .kv .v{font:600 12px var(--body);color:var(--ink);}
+  .dayrow{display:flex;align-items:center;gap:10px;padding:8px 0;}
+  .dayrow .dl{font:600 10.5px/1 var(--body);color:var(--muted);width:42px;flex:0 0 auto;letter-spacing:.03em;}
+  .dayrow .dt{flex:1;height:16px;background:var(--sky-50);border:1px solid var(--line);border-radius:99px;position:relative;overflow:hidden;}
+  .dayrow .df{position:absolute;left:0;top:0;bottom:0;border-radius:99px;background:linear-gradient(90deg,var(--sky-400),var(--sky-600));}
+  .dayrow .df.full{background:linear-gradient(90deg,#4cbf9a,var(--ok));}
+  .dayrow .dp{position:absolute;left:0;top:0;bottom:0;border-radius:99px;background:repeating-linear-gradient(45deg,rgba(224,161,0,.85) 0 4px,rgba(224,161,0,.45) 4px 8px);}
+  .dayrow .dv{font:600 11px/1 var(--body);color:var(--ink);width:52px;text-align:right;flex:0 0 auto;}
+  .dayrow.locked{opacity:.45;}
+  .achv-legend{display:flex;gap:14px;flex-wrap:wrap;margin:9px 2px 0;}
+  .achv-legend span{display:inline-flex;align-items:center;gap:6px;font:500 10px/1 var(--body);color:var(--muted);}
+  .achv-legend i{width:11px;height:8px;border-radius:3px;display:inline-block;}
+  .achv-legend i.a{background:var(--sky-500);} .achv-legend i.f{background:var(--ok);}
+  .achv-legend i.p{background:var(--warn);} .achv-legend i.t{background:var(--sky-50);border:1px solid var(--line);}
+  .bigstat{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-bottom:13px;}
+  .bigstat .b{background:var(--white);border:1px solid var(--line);border-radius:16px;padding:14px;box-shadow:var(--sh-sm);}
+  .bigstat .b .n{font:700 23px/1 var(--disp);color:var(--sky-600);}
+  .bigstat .b .n.g{color:var(--ok);} .bigstat .b .n.w{color:#b8860b;} .bigstat .b .n.r{color:var(--bad);}
+  .bigstat .b .l{font:500 10.5px/1.35 var(--body);color:var(--muted);margin-top:6px;}
+
+  .sync-bar{display:flex;align-items:center;gap:10px;border-radius:14px;padding:12px 13px;margin-bottom:13px;border:1px solid;}
+  .sync-bar .d{width:9px;height:9px;border-radius:50%;flex:0 0 auto;}
+  .sync-bar .t{flex:1;font:400 11.5px/1.45 var(--body);}
+  .sync-bar.ok{background:var(--ok-bg);border-color:#bfe6d6;color:#1a7a5e;}
+  .sync-bar.ok .d{background:var(--ok);}
+  .sync-bar.warn{background:var(--warn-bg);border-color:#f0dda0;color:#8a6d00;}
+  .sync-bar.warn .d{background:var(--warn);}
+  .sync-bar.wait{background:var(--sky-50);border-color:var(--sky-200);color:var(--sky-700);}
+  .sync-bar.wait .d{background:var(--sky-400);}
+  .sync-bar.off{background:#f4f6f8;border-color:#dfe5ea;color:var(--muted);}
+  .sync-bar.off .d{background:var(--muted);}
+  .sdot{width:9px;height:9px;border-radius:50%;display:inline-block;}
+  .sdot.ok{background:var(--ok);} .sdot.wait{background:var(--warn);}
+
+  /* ---- modal ---- */
+  .ovl{position:absolute;inset:0;background:rgba(12,39,64,.55);display:flex;align-items:flex-end;justify-content:center;z-index:80;padding:14px;}
+  .sheet{width:100%;background:var(--white);border-radius:22px;padding:20px 18px 18px;box-shadow:var(--sh-lg);animation:rise .22s cubic-bezier(.2,.8,.2,1);}
+  @keyframes rise{from{transform:translateY(28px);opacity:0;}to{transform:translateY(0);opacity:1;}}
+  .sheet h3{font:600 19px/1.2 var(--disp);margin-bottom:8px;}
+  .sheet p{font:400 12.8px/1.5 var(--body);color:var(--muted);margin-bottom:13px;}
+  .sheet .acts{display:flex;gap:9px;margin-top:14px;}
+  .sheet .acts .btn{flex:1;}
+  .spin{width:34px;height:34px;border:3px solid var(--sky-100);border-top-color:var(--sky-500);border-radius:50%;animation:sp .8s linear infinite;margin:6px auto 14px;}
+  @keyframes sp{to{transform:rotate(360deg);}}
+  .gps-ok{font:600 12.5px var(--body);color:var(--ok);background:var(--ok-bg);border:1px solid #bfe6d6;border-radius:10px;padding:10px 12px;}
+
+  .ver{text-align:center;font:500 10px/1.4 var(--body);color:var(--muted);margin-top:12px;letter-spacing:.02em;}
+  .toast{position:absolute;left:50%;bottom:94px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;font:500 12.5px var(--body);padding:11px 17px;border-radius:12px;box-shadow:var(--sh-md);opacity:0;pointer-events:none;transition:.25s;z-index:50;max-width:88%;text-align:center;}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+</style>
+</head>
+<body>
+<div class="phone"><div class="screen">
+  <div id="app"></div>
+  <div id="modal"></div>
+  <div class="toast" id="toast"></div>
+</div></div>
+
+<script>
+/* =========================================================
+   ITN Household Registration — HHR app
+   HHR01 … HHR100 · 10 days · 25 households per day
+   ========================================================= */
+const APP_VERSION='2026.07.30e';
+
+/* =========================================================
+   BACKEND — paste the Google Apps Script /exec URL here, or use
+   "Connect NMDR" on the days screen. Records are keyed on
+   _id and UPSERTED, so a resubmitted record updates its own row
+   instead of creating a second one.
+   ========================================================= */
+let GAS_URL="";
+const HHR_COUNT=100;      /* HHR01 … HHR100 */
+const DAYS=10;            /* Day 1 … Day 10 */
+const PER_DAY=25;         /* households per HHR per day */
+
+/* ---------- credentials ----------
+   One row per HHR. Every account is admin / admin for now — replace the
+   u and p values here when the real per-HHR credentials are issued. */
+const CREDS={};
+for(let i=1;i<=HHR_COUNT;i++){
+  CREDS[hhrId(i)]={u:'admin', p:'admin'};
+}
+function hhrId(i){ return 'HHR'+String(i).padStart(2,'0'); }
+function hhrNum(id){ return parseInt(String(id).replace(/\D/g,''),10); }
+
+/* ---------- storage ---------- */
+const Store=(()=>{let ok=false,mem={};try{localStorage.setItem('__t','1');localStorage.removeItem('__t');ok=true;}catch(e){}
+ return{get(k,d){if(ok){try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v);}catch(e){return d;}}return k in mem?mem[k]:d;},
+        set(k,v){if(ok){try{localStorage.setItem(k,JSON.stringify(v));return;}catch(e){}}mem[k]=v;},
+        del(k){if(ok){try{localStorage.removeItem(k);return;}catch(e){}}delete mem[k];}};})();
+const SESS_KEY='itn_hhr_session_v1';
+const URL_KEY='itn_hhr_gas_url_v1';
+const recKey=id=>'itn_hhr_done_'+id;
+
+/* done[day][hh] = true. Kept per HHR so each login sees only its own work. */
+GAS_URL=Store.get(URL_KEY,GAS_URL)||GAS_URL;
+let me=Store.get(SESS_KEY,null);      /* the HHR currently logged in */
+let done={};
+function loadDone(){ done = me ? Store.get(recKey(me),{}) : {}; loadRecs(); }
+function saveDone(){ if(me) Store.set(recKey(me),done); }
+function isDone(d,h){ return !!(done[d]&&done[d][h]); }
+function setDone(d,h,v){
+  if(!done[d]) done[d]={};
+  if(v) done[d][h]=true; else delete done[d][h];
+  saveDone();
+}
+/* the answers themselves, per HHR: rec['d1h1'] = {...} */
+let recs={};
+function loadRecs(){ recs = me ? Store.get('itn_hhr_recs_'+me,{}) : {}; }
+function saveRecs(){ if(me) Store.set('itn_hhr_recs_'+me,recs); }
+function recKeyOf(d,h){ return 'd'+d+'h'+h; }
+function recGet(d,h){ return recs[recKeyOf(d,h)]||null; }
+function recSet(d,h,v){ recs[recKeyOf(d,h)]=v; saveRecs(); }
+/* A record is `unsent` before its first successful submission and `changed`
+   after an edit. Both mean the same thing to the sender: push it again. */
+function needsSend(r){ return !!r && (!r._submitted || !!r._dirty); }
+function dayRecs(d){ const out=[]; for(let h=1;h<=PER_DAY;h++){ const r=recGet(d,h); if(r) out.push(r); } return out; }
+function dayToSend(d){ return dayRecs(d).filter(needsSend); }
+function daySubmitted(d){ return dayComplete(d) && dayToSend(d).length===0; }
+function dayChanged(d){ return dayComplete(d) && dayRecs(d).some(r=>r._submitted&&r._dirty); }
+
+function dayCount(d){ let n=0; for(let h=1;h<=PER_DAY;h++) if(isDone(d,h)) n++; return n; }
+function dayComplete(d){ return dayCount(d)===PER_DAY; }
+function totalDone(){ let n=0; for(let d=1;d<=DAYS;d++) n+=dayCount(d); return n; }
+
+/* ---------- the two locking rules ----------
+   1. Household h opens only when household h-1 in the same day is complete.
+   2. Day d opens only when every household in day d-1 is complete. */
+function dayOpen(d){ return d===1 || dayComplete(d-1); }
+function hhOpen(d,h){
+  if(!dayOpen(d)) return false;
+  if(isDone(d,h)) return true;          /* already registered — always viewable */
+  return h===1 || isDone(d,h-1);
+}
+function nextHH(d){ for(let h=1;h<=PER_DAY;h++) if(!isDone(d,h)) return h; return null; }
+function currentDay(){ for(let d=1;d<=DAYS;d++) if(!dayComplete(d)) return d; return DAYS; }
+
+/* =========================================================
+   SENDING — one record per call, JSONP so it works from a phone
+   without CORS. The server upserts on _id.
+   ========================================================= */
+function sendRec(rec,cb){
+  if(!GAS_URL){ cb(false,'no-url'); return; }
+  const fn='__s'+Date.now()+Math.floor(Math.random()*1e4); let done=false;
+  const el=document.createElement('script');
+  window[fn]=r=>{ done=true; delete window[fn]; el.remove();
+    cb(!!(r&&(r.status==='ok'||r.status==='updated')), r&&r.status); };
+  el.onerror=()=>{ if(done) return; delete window[fn]; el.remove(); cb(false,'network'); };
+  el.src=GAS_URL+(GAS_URL.indexOf('?')>-1?'&':'?')+'data='+encodeURIComponent(JSON.stringify(rec))
+        +'&callback='+fn+'&t='+Date.now();
+  document.body.appendChild(el);
+  setTimeout(()=>{ if(!done){ try{delete window[fn]; el.remove();}catch(e){} cb(false,'timeout'); } },20000);
+}
+function setGAS(){
+  const v=prompt('Paste the NMDR submission URL (ends with /exec):',GAS_URL||'');
+  if(v===null) return;
+  const t=v.trim();
+  if(t&&t.indexOf('script.google.com')===-1){ toast('That does not look like a /exec URL'); return; }
+  GAS_URL=t; Store.set(URL_KEY,t); toast(t?'NMDR connected':'Disconnected'); renderDays();
+}
+
+const I={
+ home:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>',
+ back:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg>',
+ out:'<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><path d="M15 17l5-5-5-5"/><path d="M20 12H9"/><path d="M13 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h7"/></svg>',
+ check:'<svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg>',
+ chart:'<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 20h16"/><rect x="6" y="11" width="3" height="6" rx="1"/><rect x="11" y="6" width="3" height="11" rx="1"/><rect x="16" y="14" width="3" height="3" rx="1"/></svg>',
+ pin:'<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11z"/><circle cx="12" cy="10" r="2.6"/></svg>',
+ clip:'<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1"/><path d="M9 10h6M9 14h6"/></svg>',
+ arrow:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>',
+ lock:'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>'
+};
+const app=document.getElementById('app');
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('show'),2200);}
+
+/* =========================================================
+   SCREEN 1 — the HHR list
+   ========================================================= */
+let pickId=null;   /* HHR tapped, awaiting login */
+function renderHHRs(){
+  let tiles='';
+  for(let i=1;i<=HHR_COUNT;i++){
+    const id=hhrId(i);
+    const rec=Store.get(recKey(id),{});
+    const n=Object.keys(rec).reduce((s,d)=>s+Object.keys(rec[d]||{}).length,0);
+    const all=DAYS*PER_DAY;
+    const cls=n>=all?'done':(n>0?'todo':'');
+    tiles+=`<button class="tile ${cls}" onclick="openLogin('${id}')">
+      <div class="tn">${id}</div>
+      <div class="tk">${n} / ${all} households</div>
+      <div class="ttrack"><div class="tfill ${n>=all?'full':''}" style="width:${Math.round(n/all*100)}%"></div></div>
+    </button>`;
+  }
+  app.innerHTML=`<div class="body">
+    <div class="hero">
+      <h1>ITN Household Registration</h1>
+      <p>Select your registrar ID and sign in. Each registrar covers 25 households a day over 10 days.</p>
+    </div>
+    <div class="list">
+      <h2>Registrars</h2>
+      <div class="sub">${HHR_COUNT} accounts · HHR01 to HHR${HHR_COUNT}</div>
+      <div class="grid g3">${tiles}</div>
+      <div class="ver">Version ${esc(APP_VERSION)}</div>
+    </div></div>`;
+}
+
+/* =========================================================
+   LOGIN
+   ========================================================= */
+function openLogin(id){ pickId=id; renderLogin(''); }
+function renderLogin(err){
+  app.innerHTML=`<div class="appbar">
+      <button class="ico-btn" onclick="renderHHRs()">${I.back}</button>
+      <div class="titles"><div class="eyebrow">Sign in</div><div class="title">${esc(pickId)}</div></div>
+    </div>
+    <div class="body"><div class="list">
+      <h2>Sign in as ${esc(pickId)}</h2>
+      <div class="sub">Use the username and password issued to this registrar.</div>
+      ${err?`<div class="flag bad">${esc(err)}</div>`:''}
+      <div class="card">
+        <div class="field"><div class="lbl">Username</div>
+          <input type="text" id="lu" autocapitalize="none" autocomplete="off" spellcheck="false" placeholder="Username"></div>
+        <div class="field" style="margin-bottom:0"><div class="lbl">Password</div>
+          <input type="password" id="lp" autocomplete="off" placeholder="Password"></div>
+      </div>
+      <div class="note">Every account is <b>admin</b> / <b>admin</b> until the real credentials are issued.</div>
+    </div></div>
+    <div class="footer"><button class="btn btn-primary btn-block" onclick="doLogin()">Sign in</button></div>`;
+  const p=document.getElementById('lp');
+  p.addEventListener('keydown',e=>{ if(e.key==='Enter') doLogin(); });
+  document.getElementById('lu').focus();
+}
+function doLogin(){
+  const u=document.getElementById('lu').value.trim();
+  const p=document.getElementById('lp').value;
+  const c=CREDS[pickId];
+  if(!c||u.toLowerCase()!==c.u||p!==c.p){ renderLogin('Username or password is wrong. Try again.'); return; }
+  me=pickId; Store.set(SESS_KEY,me); loadDone(); renderMenu();
+}
+function logout(){
+  if(!confirm('Sign out of '+me+'? Registered households stay on this device.')) return;
+  me=null; Store.del(SESS_KEY); done={}; recs={}; renderHHRs();
+}
+
+/* =========================================================
+   MENU — the two things this app does
+   ========================================================= */
+function renderMenu(){
+  const t=totalDone(), all=DAYS*PER_DAY, cur=currentDay();
+  const mapped=gpsDays().length;
+  app.innerHTML=`<div class="body">
+    <div class="hero">
+      <h1>ITN Household Registration</h1>
+      <p>Signed in as ${esc(me)} \u00b7 25 households a day, 10 days.</p>
+    </div>
+    <div class="list">
+      ${outBar()}
+      <button class="menu-card" onclick="renderDays()">
+        <span class="mi b">${I.clip}</span>
+        <span class="mt"><h3>Registration</h3>
+          <span>Register households day by day, 25 a day.</span>
+          <span class="mm">${t} of ${all} done \u00b7 you are on Day ${cur}</span></span>
+        <span class="ma">${I.arrow}</span></button>
+      <button class="menu-card" onclick="renderTrack(0)">
+        <span class="mi g">${I.pin}</span>
+        <span class="mt"><h3>HHR Movement Tracking</h3>
+          <span>Your route through the day on the map, household 1 to 25.</span>
+          <span class="mm">${mapped?mapped+' day'+(mapped===1?'':'s')+' with GPS points':'no GPS points yet'}</span></span>
+        <span class="ma">${I.arrow}</span></button>
+      <button class="menu-card" onclick="renderAchv()">
+        <span class="mi y">${I.chart}</span>
+        <span class="mt"><h3>Target &amp; Achievement</h3>
+          <span>What you have done against your target, per day and overall.</span>
+          <span class="mm">${Math.round(t/all*100)}% of your ${all} \u00b7 ${DAYS*PER_DAY-t} to go</span></span>
+        <span class="ma">${I.arrow}</span></button>
+      <div style="height:4px"></div>
+      <button class="btn btn-ghost btn-block btn-sm" onclick="logout()">Sign out of ${esc(me)}</button>
+      <div class="ver">Version ${esc(APP_VERSION)}${GAS_URL?' \u00b7 NMDR connected':''}</div>
+    </div></div>`;
+}
+
+/* =========================================================
+   DAYS 1 … 10
+   ========================================================= */
+function renderDays(){
+  const cur=currentDay();
+  let tiles='';
+  for(let d=1;d<=DAYS;d++){
+    const n=dayCount(d), full=dayComplete(d), open=dayOpen(d);
+    const sent=daySubmitted(d), out=dayToSend(d).length;
+    const cls = full?'done' : !open?'locked todo' : (d===cur?'todo next':'todo');
+    const badge = full?(sent?'Submitted':out+' to send') : !open?I.lock+' Locked' : (n?n+' of '+PER_DAY:'Not started');
+    const line = full ? (sent?'All '+PER_DAY+' submitted':out+' record'+(out===1?'':'s')+' waiting to submit')
+                      : n+' of '+PER_DAY+' households registered';
+    tiles+=`<button class="tile ${cls}" ${open?`onclick="renderDay(${d})"`:`onclick="toast('Finish Day ${d-1} first — all ${PER_DAY} households.')"`}>
+      <div class="top"><span class="tn">Day ${d}</span><span class="tb">${badge}</span></div>
+      <div class="tk">${line}</div>
+      <div class="ttrack"><div class="tfill ${full?'full':''}" style="width:${Math.round(n/PER_DAY*100)}%"></div></div>
+    </button>`;
+  }
+  const t=totalDone(), all=DAYS*PER_DAY;
+  app.innerHTML=`<div class="appbar">
+      <button class="ico-btn" onclick="renderMenu()">${I.back}</button>
+      <div class="titles"><div class="eyebrow">Registration</div><div class="title">${esc(me)} · daily workload</div></div>
+      <span class="tag-pill me">${esc(me)}</span>
+    </div>
+    <div class="body"><div class="list">
+      <h2>Your 10 days</h2>
+      <div class="sub">25 households a day. A day opens once the day before it is finished.</div>
+      <div class="stat-grid">
+        <div class="stat"><div class="n ${t>=all?'g':''}">${t}</div><div class="l">Households registered of ${all}</div></div>
+        <div class="stat"><div class="n r">${all-t}</div><div class="l">Still to register</div></div>
+      </div>
+      ${outBar()}
+      <div class="legend"><span><i class="d"></i>Complete</span><span><i class="t"></i>Not complete</span><span><i class="l"></i>Locked</span></div>
+      <div class="grid g2">${tiles}</div>
+    </div></div>`;
+}
+
+/* Days finished but not yet in NMDR. */
+function outstandingDays(){
+  const out=[]; for(let d=1;d<=DAYS;d++) if(dayComplete(d)&&dayToSend(d).length) out.push(d);
+  return out;
+}
+function outBar(){
+  if(!GAS_URL) return `<div class="sync-bar off"><span class="d"></span>
+    <div class="t"><b>Not connected to NMDR.</b> Records stay on this device until the connection is set.</div>
+    <button class="btn btn-ghost btn-sm" style="flex:0 0 auto" onclick="setGAS()">Connect</button></div>`;
+  const o=outstandingDays();
+  if(!o.length) return `<div class="sync-bar ok"><span class="d"></span>
+    <div class="t"><b>Nothing waiting.</b> Every finished day is in NMDR.</div></div>`;
+  return `<div class="sync-bar warn"><span class="d"></span>
+    <div class="t"><b>Day ${o.join(', Day ')} not submitted.</b><br>Open the day and submit its records.</div></div>`;
+}
+
+
+
+/* =========================================================
+   TARGET AND ACHIEVEMENT
+   ---------------------------------------------------------
+   Target is fixed by the workload: 25 households a day, 10 days,
+   250 in all. Achievement is what has been registered, with the
+   part that has reached NMDR shown separately from the part
+   still sitting on the phone.
+   ========================================================= */
+function achvDay(d){
+  const rs=dayRecs(d);
+  const sent=rs.filter(r=>r._submitted&&!r._dirty).length;
+  return {
+    d:d, target:PER_DAY, done:dayCount(d), sent:sent, pending:rs.length-sent,
+    open:dayOpen(d),
+    people:rs.reduce((s,r)=>s+(Number(r.size)||0),0),
+    itns:rs.reduce((s,r)=>s+(Number(r.itns)||0),0),
+    u5:rs.reduce((s,r)=>s+(Number(r.u5)||0),0)
+  };
+}
+function achvAll(){
+  const days=[]; for(let d=1;d<=DAYS;d++) days.push(achvDay(d));
+  const sum=k=>days.reduce((s,x)=>s+x[k],0);
+  return {days:days, target:DAYS*PER_DAY, done:sum('done'), sent:sum('sent'), pending:sum('pending'),
+          people:sum('people'), itns:sum('itns'), u5:sum('u5'),
+          daysDone:days.filter(x=>x.done===PER_DAY).length};
+}
+/* A ring rather than a bar, because a share of a target reads faster as one. */
+function ring(pct,label,sub,colour){
+  const R=54, C=2*Math.PI*R, on=Math.max(0,Math.min(100,pct))/100*C;
+  return `<div class="rw">
+    <svg viewBox="0 0 128 128" width="128" height="128">
+      <circle cx="64" cy="64" r="${R}" fill="none" stroke="#e3f1fb" stroke-width="15"/>
+      <circle cx="64" cy="64" r="${R}" fill="none" stroke="${colour}" stroke-width="15" stroke-linecap="round"
+        stroke-dasharray="${on.toFixed(1)} ${(C-on).toFixed(1)}" transform="rotate(-90 64 64)"/>
+    </svg>
+    <div class="ring-txt"><span class="p">${label}</span><span class="s">${esc(sub)}</span></div>
+  </div>`;
+}
+function renderAchv(){
+  const a=achvAll();
+  const pct=Math.round(a.done/a.target*100);
+  const cur=currentDay(), today=achvDay(cur);
+  const rows=a.days.map(x=>{
+    const w=Math.round(x.done/x.target*100), pw=Math.round(x.pending/x.target*100);
+    return `<div class="dayrow ${x.open?'':'locked'}">
+      <span class="dl">Day ${x.d}</span>
+      <span class="dt">
+        <span class="df ${x.done===x.target?'full':''}" style="width:${w}%"></span>
+        <span class="dp" style="left:${Math.round(x.sent/x.target*100)}%;width:${pw}%"></span>
+      </span>
+      <span class="dv">${x.done}/${x.target}</span></div>`;
+  }).join('');
+  app.innerHTML=`<div class="appbar">
+      <button class="ico-btn" onclick="renderMenu()">${I.back}</button>
+      <div class="titles"><div class="eyebrow">${esc(me)} \u00b7 target and achievement</div><div class="title">${a.done} of ${a.target} households</div></div>
+      <span class="tag-pill me">${pct}%</span>
+    </div>
+    <div class="body"><div class="list">
+      <div class="ring-card">
+        ${ring(pct,pct+'%','of '+a.target+' households',pct>=100?'#2aa17c':'#2680bd')}
+        <div class="rl"><h4>Overall</h4>
+          <div class="kv"><span class="k">Target</span><span class="v">${a.target}</span></div>
+          <div class="kv"><span class="k">Registered</span><span class="v">${a.done}</span></div>
+          <div class="kv"><span class="k">Remaining</span><span class="v">${a.target-a.done}</span></div>
+          <div class="kv"><span class="k">Days finished</span><span class="v">${a.daysDone} of ${DAYS}</span></div>
+        </div>
+      </div>
+
+      <div class="ring-card">
+        ${ring(today.target?Math.round(today.done/today.target*100):0,
+               today.done+'/'+today.target,'Day '+cur,today.done>=today.target?'#2aa17c':'#3d9ad6')}
+        <div class="rl"><h4>Day ${cur} \u00b7 the day you are on</h4>
+          <div class="kv"><span class="k">Registered today</span><span class="v">${today.done}</span></div>
+          <div class="kv"><span class="k">Left to reach 25</span><span class="v">${Math.max(0,today.target-today.done)}</span></div>
+          <div class="kv"><span class="k">In NMDR</span><span class="v">${today.sent}</span></div>
+          <div class="kv"><span class="k">Still on the phone</span><span class="v">${today.pending}</span></div>
+        </div>
+      </div>
+
+      <div class="bigstat">
+        <div class="b"><div class="n g">${a.sent}</div><div class="l">Records in NMDR</div></div>
+        <div class="b"><div class="n ${a.pending?'w':''}">${a.pending}</div><div class="l">Registered, not yet submitted</div></div>
+        <div class="b"><div class="n">${a.people}</div><div class="l">People counted in your households</div></div>
+        <div class="b"><div class="n">${a.itns}</div><div class="l">ITNs your households are due</div></div>
+      </div>
+
+      <div class="card">
+        <h4><span class="dot"></span>Every day against its target of ${PER_DAY}</h4>
+        ${rows}
+        <div class="achv-legend">
+          <span><i class="a"></i>Registered</span><span><i class="f"></i>Day complete</span>
+          <span><i class="p"></i>Not yet submitted</span><span><i class="t"></i>Target</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h4><span class="dot"></span>Households you have reached</h4>
+        <div class="kv"><span class="k">People in those households</span><span class="v">${a.people}</span></div>
+        <div class="kv"><span class="k">Under-fives among them</span><span class="v">${a.u5}</span></div>
+        <div class="kv"><span class="k">ITNs to be given</span><span class="v">${a.itns}</span></div>
+        <div class="kv"><span class="k">Average household size</span><span class="v">${a.done?(a.people/a.done).toFixed(1):'\u2014'}</span></div>
+        <div class="kv"><span class="k">ITNs per household</span><span class="v">${a.done?(a.itns/a.done).toFixed(1):'\u2014'}</span></div>
+      </div>
+      ${a.pending?`<button class="btn btn-primary btn-block btn-sm" onclick="renderDays()">Go and submit the ${a.pending} outstanding record${a.pending===1?'':'s'}</button>`:''}
+    </div></div>`;
+}
+
+/* =========================================================
+   HHR MOVEMENT TRACKING
+   ---------------------------------------------------------
+   The GPS point taken at each household, in the order they were
+   registered, numbered 1 to 25 and joined by lines. Drawn with
+   Leaflet on OpenStreetMap tiles, so this screen needs internet;
+   the ordered list below the map works without it.
+   ========================================================= */
+const LEAFLET_CSS='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+const LEAFLET_JS ='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+let trackDay=0, lmap=null, lloading=false;
+
+/* the points of one day, in registration order, GPS only */
+function trackPoints(d){
+  const out=[];
+  for(let h=1;h<=PER_DAY;h++){
+    const r=recGet(d,h);
+    if(r&&r.gpsLat!==''&&r.gpsLat!=null) out.push({h:h,lat:+r.gpsLat,lng:+r.gpsLng,acc:r.gpsAcc,r:r});
+  }
+  return out;
+}
+function gpsDays(){ const o=[]; for(let d=1;d<=DAYS;d++) if(trackPoints(d).length) o.push(d); return o; }
+/* metres between two points, straight line */
+function metres(a,b){
+  const R=6371000, t=Math.PI/180;
+  const dLat=(b.lat-a.lat)*t, dLng=(b.lng-a.lng)*t;
+  const la=a.lat*t, lb=b.lat*t;
+  const x=Math.sin(dLat/2)**2+Math.cos(la)*Math.cos(lb)*Math.sin(dLng/2)**2;
+  return Math.round(2*R*Math.asin(Math.sqrt(x)));
+}
+/* Households registered within this many metres of each other cannot be told
+   apart on the map, so they share one marker labelled with all their numbers
+   (2,3,4) instead of stacking and hiding each other. */
+const CLUSTER_M=20;
+function clusterPoints(pts,thresh){
+  const t=thresh||CLUSTER_M, groups=[];
+  pts.forEach(p=>{
+    let g=null;
+    for(let i=0;i<groups.length;i++){ if(metres(groups[i],p)<=t){ g=groups[i]; break; } }
+    if(g){
+      g.items.push(p);
+      g.lat=g.items.reduce((s,x)=>s+x.lat,0)/g.items.length;   /* centre of the group */
+      g.lng=g.items.reduce((s,x)=>s+x.lng,0)/g.items.length;
+    } else {
+      groups.push({lat:p.lat,lng:p.lng,items:[p]});
+    }
+  });
+  groups.forEach(g=>{
+    g.hs=g.items.map(x=>x.h).sort((a,b)=>a-b);
+    g.label=g.hs.length<=6?g.hs.join(','):g.hs.slice(0,5).join(',')+' +'+(g.hs.length-5);
+  });
+  return groups;
+}
+/* which group each household ended up in */
+function groupOf(groups,h){ return groups.find(g=>g.hs.indexOf(h)>-1)||null; }
+/* the route: group centres in visit order, without repeating a point you are
+   already standing on */
+function routeLine(pts,groups){
+  const out=[];
+  pts.forEach(p=>{
+    const g=groupOf(groups,p.h); if(!g) return;
+    const last=out[out.length-1];
+    if(!last||last[0]!==g.lat||last[1]!==g.lng) out.push([g.lat,g.lng]);
+  });
+  return out;
+}
+function pathLength(pts){ let m=0; for(let i=1;i<pts.length;i++) m+=metres(pts[i-1],pts[i]); return m; }
+const asDist=m=>m<1000?m+' m':(m/1000).toFixed(1)+' km';
+const hhmm=iso=>String(iso||'').slice(11,16);
+
+function renderTrack(d){
+  const days=gpsDays();
+  if(!d) d = days.indexOf(trackDay)>-1 ? trackDay : (days.length?days[days.length-1]:1);
+  trackDay=d;
+  const pts=trackPoints(d);
+  const groups=clusterPoints(pts);
+  const shared=groups.filter(g=>g.hs.length>1);
+  const chips=[];
+  for(let x=1;x<=DAYS;x++){
+    const has=trackPoints(x).length;
+    chips.push(`<button class="${x===d?'on':''}" ${has?`onclick="renderTrack(${x})"`:'disabled'}>Day ${x}${has?' \u00b7 '+has:''}</button>`);
+  }
+  let steps='';
+  pts.forEach((p,i)=>{
+    const gap=i?metres(pts[i-1],p):0;
+    const g=groupOf(groups,p.h);
+    const with_=g&&g.hs.length>1?g.hs.filter(x=>x!==p.h):[];
+    steps+=`<div class="step-row">
+      <span class="sn ${i===0?'first':(i===pts.length-1?'last':'')}">${p.h}</span>
+      <span class="sm"><span class="t">${esc((p.r.first||'')+' '+(p.r.last||''))} \u00b7 ${esc(p.r.token||'')}</span>
+        <span class="s">${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}${p.acc?' (\u00b1'+p.acc+' m)':''}${hhmm(p.r.gpsAt)?' \u00b7 '+hhmm(p.r.gpsAt):''}${with_.length?' \u00b7 same point as '+with_.join(', '):''}</span></span>
+      <span class="sg">${i?'+'+asDist(gap):'start'}</span></div>`;
+  });
+  app.innerHTML=`<div class="appbar">
+      <button class="ico-btn" onclick="renderMenu()">${I.back}</button>
+      <div class="titles"><div class="eyebrow">${esc(me)} \u00b7 movement tracking</div><div class="title">Day ${d} route</div></div>
+      <span class="tag-pill me">${pts.length}/${PER_DAY}</span>
+    </div>
+    <div class="body"><div class="list">
+      <div class="daybar">${chips.join('')}</div>
+      ${pts.length?`<div class="stat-grid">
+          <div class="stat"><div class="n">${pts.length}</div><div class="l">Households mapped on Day ${d}</div></div>
+          <div class="stat"><div class="n g">${asDist(pathLength(pts))}</div><div class="l">Distance along the route</div></div>
+        </div>
+        ${shared.length?`<div class="sync-bar wait"><span class="d"></span>
+          <div class="t">${shared.length} point${shared.length===1?'':'s'} hold more than one household \u2014 within ${CLUSTER_M} m the GPS cannot separate them, so they share one marker: ${esc(shared.map(g=>g.label).join(' \u00b7 '))}.</div></div>`:''}`:''}
+      <div id="map"></div>
+      <div id="mapmsg"></div>
+      ${pts.length?`<div class="sub" style="margin:15px 0 8px"><b>Household 1 to ${pts[pts.length-1].h}</b>, in the order you registered them.${hhmm(pts[0].r.gpsAt)?' Started '+hhmm(pts[0].r.gpsAt)+', finished '+hhmm(pts[pts.length-1].r.gpsAt)+'.':''}</div>
+        <div class="card steps">${steps}</div>`
+        :`<div class="sync-bar wait" style="margin-top:13px"><span class="d"></span>
+           <div class="t">No GPS points for Day ${d} yet. A point is taken at each household as it is registered.</div></div>`}
+    </div></div>`;
+  if(pts.length) drawMap(pts); else document.getElementById('map').style.display='none';
+}
+
+/* Leaflet is pulled in on first use so the rest of the app does not wait on it. */
+function withLeaflet(cb){
+  if(window.L){ cb(true); return; }
+  if(lloading){ setTimeout(()=>withLeaflet(cb),300); return; }
+  lloading=true;
+  const css=document.createElement('link');
+  css.rel='stylesheet'; css.href=LEAFLET_CSS; document.head.appendChild(css);
+  const js=document.createElement('script');
+  js.src=LEAFLET_JS;
+  js.onload=()=>{ lloading=false; cb(!!window.L); };
+  js.onerror=()=>{ lloading=false; cb(false); };
+  document.head.appendChild(js);
+  setTimeout(()=>{ if(lloading){ lloading=false; cb(!!window.L); } },15000);
+}
+function mapMsg(html){ const e=document.getElementById('mapmsg'); if(e) e.innerHTML=html; }
+function drawMap(pts){
+  const host=document.getElementById('map');
+  if(!host) return;
+  host.innerHTML=`<div style="height:100%;display:grid;place-items:center"><div class="spin"></div></div>`;
+  withLeaflet(ok=>{
+    const h=document.getElementById('map');
+    if(!h) return;
+    if(!ok||!window.L){
+      h.style.display='none';
+      mapMsg(`<div class="sync-bar warn"><span class="d"></span>
+        <div class="t"><b>Map needs internet.</b> The route is listed below with its coordinates.</div>
+        <button class="btn btn-ghost btn-sm" style="flex:0 0 auto" onclick="renderTrack(${trackDay})">Retry</button></div>`);
+      return;
+    }
+    mapMsg('');
+    h.innerHTML='';
+    if(lmap){ try{ lmap.remove(); }catch(e){} lmap=null; }
+    const groups=clusterPoints(pts);
+    const line=routeLine(pts,groups);
+    lmap=L.map(h,{zoomControl:true,attributionControl:true});
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+      {maxZoom:19, attribution:'\u00a9 OpenStreetMap contributors'}).addTo(lmap);
+    if(line.length>1){
+      L.polyline(line,{color:'#2680bd',weight:3.5,opacity:.9}).addTo(lmap);
+      L.polyline(line,{color:'#ffffff',weight:1,opacity:.7,dashArray:'4 7'}).addTo(lmap);
+    }
+    const firstH=pts[0].h, lastH=pts[pts.length-1].h;
+    groups.forEach(g=>{
+      const k = g.hs.indexOf(firstH)>-1 ? 'first' : (g.hs.indexOf(lastH)>-1 ? 'last' : '');
+      const multi = g.hs.length>1;
+      const w = multi ? 12+g.label.length*7 : 26;
+      const body = g.items.map(p=>`<b>Household ${p.h}</b><br>${esc((p.r.first||'')+' '+(p.r.last||''))}<br>
+          ${esc(p.r.token||'')}<br>${p.r.size||''} people \u00b7 ${p.r.itns||''} ITN${p.r.itns===1?'':'s'}${hhmm(p.r.gpsAt)?' \u00b7 '+hhmm(p.r.gpsAt):''}`).join('<hr style="border:none;border-top:1px solid #dceaf5;margin:7px 0">');
+      L.marker([g.lat,g.lng],{icon:L.divIcon({className:'',
+          html:`<div class="mk ${k} ${multi?'multi':''}">${esc(g.label)}</div>`,
+          iconSize:[w,26],iconAnchor:[w/2,13]}),zIndexOffset:multi?1000:0}).addTo(lmap)
+        .bindPopup(`<div class="mpop">${multi?`<div style="font:600 11px var(--body);color:#5f7f96;margin-bottom:6px">${g.hs.length} households at this point</div>`:''}${body}</div>`);
+    });
+    if(line.length>1) lmap.fitBounds(L.latLngBounds(line).pad(0.18));
+    else lmap.setView(line[0],17);
+    setTimeout(()=>{ try{ lmap.invalidateSize(); }catch(e){} },200);
+  });
+}
+
+/* =========================================================
+   25 HOUSEHOLD CARDS FOR ONE DAY
+   ========================================================= */
+function renderDay(d){
+  if(!dayOpen(d)){ renderDays(); return; }
+  const nx=nextHH(d);
+  let tiles='';
+  for(let h=1;h<=PER_DAY;h++){
+    const ok=isDone(d,h), open=hhOpen(d,h);
+    const rec=recGet(d,h), pend=ok&&needsSend(rec);
+    const cls = ok?'done' : open?(h===nx?'todo next':'todo') : 'locked todo';
+    const state = ok?(pend?'To send':'Sent') : open?(h===nx?'Next':'To do') : I.lock;
+    tiles+=`<button class="tile hh ${cls}" ${open?`onclick="openHH(${d},${h})"`:`onclick="toast('Household ${h-1} has to be registered first.')"`}>
+      ${pend?'<span class="pend"></span>':''}
+      <span class="hn">${h}</span><span class="hs">${state}</span></button>`;
+  }
+  const n=dayCount(d);
+  app.innerHTML=`<div class="appbar">
+      <button class="ico-btn" onclick="renderDays()">${I.back}</button>
+      <div class="titles"><div class="eyebrow">${esc(me)} · Day ${d} of ${DAYS}</div><div class="title">25 households</div></div>
+      <span class="tag-pill me">${n}/${PER_DAY}</span>
+    </div>
+    <div class="body"><div class="list">
+      <h2>Day ${d}</h2>
+      <div class="sub">${n} of ${PER_DAY} registered.${nx?' Household '+nx+' is next — they open one at a time, in order.':' Day '+d+' is complete'+(d<DAYS?', Day '+(d+1)+' is now open.':'.')}</div>
+      ${daySubmitBar(d)}
+      <div class="legend"><span><i class="d"></i>Registered</span><span><i class="t"></i>Not registered</span><span><i class="l"></i>Locked</span></div>
+      <div class="grid g4">${tiles}</div>
+    </div></div>`;
+}
+
+/* The day's records are submitted as a batch, once the day is finished. */
+function daySubmitBar(d){
+  if(!dayComplete(d)) return `<div class="sync-bar wait"><span class="d"></span>
+    <div class="t">Records are submitted once all ${PER_DAY} households of the day are registered.</div></div>`;
+  const out=dayToSend(d), changed=dayRecs(d).filter(r=>r._submitted&&r._dirty).length;
+  if(!out.length) return `<div class="sync-bar ok"><span class="d"></span>
+    <div class="t"><b>Day ${d} submitted.</b> All ${PER_DAY} records are in NMDR.</div></div>`;
+  const label = changed===out.length
+    ? 'Resubmit '+changed+' changed record'+(changed===1?'':'s')
+    : 'Submit Day '+d+' \u00b7 '+out.length+' record'+(out.length===1?'':'s');
+  return `<div class="sync-bar warn"><span class="d"></span>
+    <div class="t"><b>${out.length} record${out.length===1?'':'s'} not submitted.</b>${changed?'<br>'+changed+' of them changed since the last submission.':''}</div>
+    <button class="btn btn-primary btn-sm" style="flex:0 0 auto" onclick="submitDay(${d})">${changed===out.length?'Resubmit':'Submit'}</button></div>`;
+}
+/* Sends one record at a time and reports what got through. A record that fails
+   keeps its unsent flag, so pressing Submit again picks up only what is left. */
+function submitDay(d){
+  if(!GAS_URL){ setGAS(); return; }
+  const q=dayToSend(d);
+  if(!q.length){ toast('Day '+d+' is already submitted'); return; }
+  if(!navigator.onLine){ modal(`<h3>No internet</h3>
+    <p>Day ${d} has ${q.length} record${q.length===1?'':'s'} to submit. They are safe on this device \u2014 connect and submit again.</p>
+    <div class="acts"><button class="btn btn-primary" onclick="closeModal()">Close</button></div>`); return; }
+  let i=0, sent=0, failed=0;
+  const draw=()=>modal(`<h3>Submitting Day ${d}</h3><div class="spin"></div>
+    <p style="text-align:center">Record ${Math.min(i+1,q.length)} of ${q.length}</p>`);
+  draw();
+  const step=()=>{
+    if(i>=q.length){ saveRecs(); doneSubmit(d,sent,failed); return; }
+    const rec=q[i]; draw();
+    sendRec(rec,(ok,status)=>{
+      if(ok){ rec._submitted=true; rec._dirty=false; rec._submittedAt=new Date().toISOString(); sent++; }
+      else { rec._lastError=status||'failed'; failed++; }
+      saveRecs(); i++; setTimeout(step,250);
+    });
+  };
+  step();
+}
+function doneSubmit(d,sent,failed){
+  const left=dayToSend(d).length;
+  modal(`<h3>${failed?'Partly submitted':'Day '+d+' submitted'}</h3>
+    <p>${sent} record${sent===1?'':'s'} went into NMDR.${failed?' '+failed+' could not be sent and are still on this device.':''}</p>
+    ${failed?`<div class="err">Day ${d} has ${left} record${left===1?'':'s'} left to submit.</div>`
+            :`<div class="gps-ok">Nothing left to send for Day ${d}.</div>`}
+    <div class="acts">
+      <button class="btn btn-ghost" onclick="closeModal();renderDay(${d})">Day ${d}</button>
+      ${failed?`<button class="btn btn-primary" onclick="closeModal();submitDay(${d})">Try the rest</button>`
+              :`<button class="btn btn-ok" onclick="closeModal();renderDays()">Back to the days</button>`}
+    </div>`);
+}
+
+/* =========================================================
+   ONE HOUSEHOLD
+   ========================================================= */
+/* ---------- the registration form ---------- */
+/* Q3 branches: a household with no phone gives an alternative contact; with no
+   alternative either, the registrar's own number is recorded so the household
+   can still be reached through them. */
+const FORM=[
+  {id:'first', n:1, q:'First name of household head', type:'text', ph:'First name'},
+  {id:'last',  n:2, q:'Last name of household head',  type:'text', ph:'Last name'},
+  {id:'hasPhone', n:3, q:'Do you have a telephone number?', type:'yn'},
+  {id:'phone',       q:'Telephone number', type:'tel', ph:'e.g. 076 123456',
+     when:a=>a.hasPhone==='Yes'},
+  {id:'hasAlt',      q:'Do you have someone else\u2019s number you can give if we want to call you?', type:'yn',
+     when:a=>a.hasPhone==='No'},
+  {id:'altPhone',    q:'Telephone number of that person', type:'tel', ph:'e.g. 076 123456',
+     when:a=>a.hasPhone==='No'&&a.hasAlt==='Yes'},
+  {id:'hhrPhone',    q:'HHR telephone number', type:'tel', ph:'Your own number',
+     help:'The household has no number to give, so your number is recorded as the contact.',
+     when:a=>a.hasPhone==='No'&&a.hasAlt==='No'},
+  {id:'size',  n:4, q:'Number of people in the household', type:'int', unit:'people', min:1, max:60},
+  {id:'itns',  n:5, q:'ITNs to be given', type:'calc',
+     help:'1 to 2 people = 1 ITN, 3 to 4 = 2 ITNs, 5 or more = 3 ITNs.',
+     from:a=>itnsFor(a.size)},
+  {id:'u5',    n:6, q:'How many under-fives are in the household?', type:'int', unit:'under-fives', min:0, max:30},
+  {id:'token', n:7, q:'Household token', type:'calc',
+     help:'Generated from your HHR ID, the household number and the head\u2019s initials.',
+     from:a=>a._token||''}
+];
+function itnsFor(size){
+  const n=parseInt(size,10);
+  if(!n||n<1) return '';
+  if(n<=2) return 1;
+  if(n<=4) return 2;
+  return 3;
+}
+/* HHR01_1_MK — the household number runs across the whole 10 days for this
+   HHR (Day 1 HH1 = 1 … Day 10 HH25 = 250) so no two tokens can collide. */
+function hhSerial(d,h){ return (d-1)*PER_DAY+h; }
+function tokenFor(id,d,h,first,last){
+  const ini=(String(first||'').trim()[0]||'')+(String(last||'').trim()[0]||'');
+  return id+'_'+hhSerial(d,h)+'_'+ini.toUpperCase();
+}
+const digits=v=>String(v||'').replace(/\D/g,'');
+function visibleQs(a){ return FORM.filter(q=>!q.when||q.when(a)); }
+function fieldErr(q,a){
+  if(q.type==='calc') return '';
+  const v=a[q.id];
+  if(v===undefined||v===null||String(v).trim()==='') return 'Required.';
+  if(q.type==='tel'&&digits(v).length<6) return 'Enter a full telephone number.';
+  if(q.type==='int'){
+    const n=Number(v);
+    if(!Number.isInteger(n)) return 'Whole numbers only.';
+    if(q.min!=null&&n<q.min) return 'Cannot be less than '+q.min+'.';
+    if(q.max!=null&&n>q.max) return 'Cannot be more than '+q.max+'.';
+  }
+  if(q.id==='u5'&&a.size!==undefined&&String(a.size).trim()!==''){
+    if(Number(v)>Number(a.size)) return 'More under-fives than people in the household.';
+  }
+  return '';
+}
+
+/* =========================================================
+   ONE HOUSEHOLD
+   ========================================================= */
+let form={}, formD=0, formH=0, showErr=false, editing=false;
+
+function openHH(d,h){
+  if(!hhOpen(d,h)){ renderDay(d); return; }
+  formD=d; formH=h; showErr=false; editing=false;
+  form=Object.assign({},recGet(d,h));
+  if(!form.hhrPhone) form.hhrPhone=Store.get('itn_hhr_phone_'+me,'');
+  isDone(d,h) ? renderSaved() : renderForm();
+}
+/* Editing changes the values of an existing record. Its token has already been
+   written on paper and given to the household head, so the token is frozen
+   from the first submission onwards even if a name is corrected. */
+function editHH(){
+  editing=true; showErr=false;
+  form=Object.assign({},recGet(formD,formH));
+  renderForm();
+}
+function refreshToken(){
+  if(editing&&form.token){ form._token=form.token; return; }
+  form._token=tokenFor(me,formD,formH,form.first,form.last);
+}
+
+function ctl(q){
+  const v=form[q.id]==null?'':form[q.id];
+  if(q.type==='yn'){
+    return `<div class="opts">
+      <div class="opt yes ${v==='Yes'?'sel':''}" data-q="${q.id}" data-v="Yes"><span class="mark"></span><span>Yes</span></div>
+      <div class="opt no ${v==='No'?'sel':''}" data-q="${q.id}" data-v="No"><span class="mark"></span><span>No</span></div>
+    </div>`;
+  }
+  if(q.type==='calc'){
+    const val=q.from(form);
+    return `<div class="field"><input type="text" readonly value="${esc(val===''?'\u2014':val)}"></div>`;
+  }
+  const t=q.type==='tel'?'tel':q.type==='int'?'number':'text';
+  const attrs=[q.min!=null?`min="${q.min}"`:'',q.max!=null?`max="${q.max}"`:'',q.type==='int'?'step="1" inputmode="numeric"':'',
+               q.type==='tel'?'inputmode="tel"':'',q.ph?`placeholder="${esc(q.ph)}"`:''].join(' ');
+  const inp=`<input type="${t}" ${attrs} data-k="${q.id}" value="${esc(v)}">`;
+  return q.unit?`<div class="field unit">${inp}<span class="u">${esc(q.unit)}</span></div>`:`<div class="field">${inp}</div>`;
+}
+function qCard(q){
+  const e=showErr?fieldErr(q,form):'';
+  return `<div class="q-card ${e?'missing':''}" id="qc_${q.id}">
+    ${q.n?`<span class="q-no">Q${q.n}</span>`:''}
+    <div class="q-txt">${esc(q.q)}${q.type==='calc'?'':'<span class="req">*</span>'}</div>
+    ${q.help?`<div class="q-help">${esc(q.help)}</div>`:''}
+    ${ctl(q)}
+    ${e?`<div class="err">${esc(e)}</div>`:''}
+  </div>`;
+}
+function renderForm(){
+  refreshToken();
+  const d=formD,h=formH;
+  app.innerHTML=`<div class="appbar">
+      <button class="ico-btn" onclick="renderDay(${d})">${I.back}</button>
+      <div class="titles"><div class="eyebrow">${esc(me)} · Day ${d}</div><div class="title">Household ${h} of ${PER_DAY}</div></div>
+      <span class="tag-pill me">${hhSerial(d,h)}/${DAYS*PER_DAY}</span>
+    </div>
+    <div class="body"><div class="list" id="fb">
+      <div class="hd-head"><div class="id">${esc(editing?(form.token||''):me+' \u00b7 D'+d+' \u00b7 HH'+h)}</div>
+        <div class="meta">Household ${h} on Day ${d} \u2014 number ${hhSerial(d,h)} of your ${DAYS*PER_DAY}.${editing?'<br>Correcting the answers on a record that is already registered.':''}</div></div>
+      ${editing?`<div class="note">Change the answers that are wrong and save. This updates the same record \u2014 it does not create a second registration, and the token stays as it was given to the household head.</div>`:''}
+      ${visibleQs(form).map(qCard).join('')}
+    </div></div>
+    <div class="footer">${editing
+      ? `<button class="btn btn-ghost btn-sm" onclick="editing=false;renderSaved()">Cancel</button>
+         <button class="btn btn-ok" onclick="submitHH()">Save changes</button>`
+      : `<button class="btn btn-ok btn-block" onclick="submitHH()">Register household ${h}</button>`}</div>`;
+  wireForm();
+}
+function wireForm(){
+  const b=document.getElementById('fb'); if(!b) return;
+  b.addEventListener('click',e=>{
+    const o=e.target.closest('.opt'); if(!o) return;
+    form[o.dataset.q]=o.dataset.v;
+    if(o.dataset.q==='hasPhone'){ delete form.hasAlt; delete form.phone; delete form.altPhone; }
+    if(o.dataset.q==='hasAlt'){ delete form.altPhone; }
+    renderForm();
+    const c=document.getElementById('qc_'+o.dataset.q); if(c) c.scrollIntoView({behavior:'smooth',block:'center'});
+  });
+  b.addEventListener('input',e=>{
+    const i=e.target.closest('[data-k]'); if(!i) return;
+    const k=i.dataset.k;
+    form[k]=i.value;
+    const card=document.getElementById('qc_'+k);
+    if(card){ card.classList.remove('missing'); const er=card.querySelector('.err'); if(er) er.remove(); }
+    if(k==='first'||k==='last'){ refreshToken(); paint('token',form._token); }
+    if(k==='size'){ paint('itns',itnsFor(form.size)); }
+  });
+}
+function paint(id,val){
+  const c=document.getElementById('qc_'+id); if(!c) return;
+  const i=c.querySelector('input'); if(i) i.value=(val===''||val==null)?'\u2014':val;
+}
+
+/* ---------- submit: token, then GPS ---------- */
+function submitHH(){
+  refreshToken();
+  const qs=visibleQs(form), bad=qs.filter(q=>fieldErr(q,form));
+  if(bad.length){
+    showErr=true; renderForm();
+    const f=document.getElementById('qc_'+bad[0].id);
+    if(f) f.scrollIntoView({behavior:'smooth',block:'center'});
+    toast(bad.length+' question'+(bad.length===1?'':'s')+' to fix');
+    return;
+  }
+  showErr=false;
+  if(editing){ saveEdit(); return; }
+  tokenStep(false);
+}
+/* An edit keeps the record's _id, token and GPS point, bumps its revision and
+   marks it for resending. The server updates that row rather than adding one. */
+function saveEdit(){
+  const d=formD,h=formH,old=recGet(d,h)||{};
+  const rec=Object.assign({},old,form,{
+    itns:itnsFor(form.size),
+    token:old.token||form._token,
+    _rev:(old._rev||1)+1,
+    _dirty:true,
+    _updatedAt:new Date().toISOString()
+  });
+  delete rec._token;
+  if(rec.hhrPhone) Store.set('itn_hhr_phone_'+me,rec.hhrPhone);
+  recSet(d,h,rec);
+  editing=false;
+  const was=!!old._submitted;
+  modal(`<h3>Changes saved</h3>
+    <div class="tok-show">${esc(rec.token)}</div>
+    <p style="margin-top:12px">${esc(rec.first+' '+rec.last)} \u00b7 ${rec.size} people \u00b7 ${rec.itns} ITN${rec.itns===1?'':'s'} \u00b7 ${rec.u5} under-five${Number(rec.u5)===1?'':'s'}<br>Revision ${rec._rev} \u00b7 same record, same token.</p>
+    ${was?`<div class="sync-bar warn" style="margin:0"><span class="d"></span>
+        <div class="t">This record was already submitted. Resubmit it so NMDR gets the corrected values.</div></div>`
+        :`<div class="gps-ok">It will go up with the rest of Day ${d}.</div>`}
+    <div class="acts">
+      <button class="btn btn-ghost" onclick="closeModal();renderSaved()">Close</button>
+      ${dayComplete(d)?`<button class="btn btn-primary" onclick="closeModal();submitDay(${d})">Resubmit now</button>`
+                      :`<button class="btn btn-ok" onclick="closeModal();renderDay(${d})">Day ${d}</button>`}
+    </div>`);
+}
+function closeModal(){ document.getElementById('modal').innerHTML=''; }
+function modal(html){ document.getElementById('modal').innerHTML=`<div class="ovl"><div class="sheet">${html}</div></div>`; }
+
+/* Step 1 — show the token and have the HHR write it down for the household. */
+function tokenStep(again){
+  modal(`<h3>${again?'Please write the token down':'Write this token down'}</h3>
+    <p>${again
+      ? 'The household head must be given the token on paper before this household can be submitted. Write it down and hand it over now.'
+      : 'HHR: write this token on paper and give it to the household head.'}</p>
+    <div class="tok-show">${esc(form._token)}</div>
+    ${again?`<div class="err" style="margin-top:10px">Not submitted yet.</div>`:''}
+    <p style="margin:14px 0 0">Have you written down the token and given it to the household head?</p>
+    <div class="acts">
+      <button class="btn btn-ghost" onclick="tokenStep(true)">No, not yet</button>
+      <button class="btn btn-ok" onclick="gpsStep()">Yes, it is written</button>
+    </div>`);
+}
+/* Step 2 — take the GPS point, then save. */
+function gpsStep(){
+  modal(`<h3>Taking GPS</h3><div class="spin"></div>
+    <p style="text-align:center">Hold still while the location of the household is recorded.</p>`);
+  if(!navigator.geolocation){ gpsFail('This device has no GPS.'); return; }
+  let settled=false;
+  const t=setTimeout(()=>{ if(!settled){ settled=true; gpsFail('GPS is taking too long.'); } },25000);
+  navigator.geolocation.getCurrentPosition(
+    p=>{ if(settled) return; settled=true; clearTimeout(t);
+      finish({lat:+p.coords.latitude.toFixed(6), lng:+p.coords.longitude.toFixed(6),
+              acc:Math.round(p.coords.accuracy||0), at:new Date().toISOString()}); },
+    e=>{ if(settled) return; settled=true; clearTimeout(t);
+      gpsFail(e&&e.code===1?'Location permission was refused.':'GPS could not get a fix.'); },
+    {enableHighAccuracy:true, timeout:20000, maximumAge:0});
+}
+/* A GPS point is required. Without one the household is not registered — the
+   only ways out are to try again or to leave the form open and come back. */
+function gpsFail(msg){
+  modal(`<h3>No GPS point yet</h3>
+    <p>${esc(msg)} Step outside or into the open and try again. The household cannot be registered without its GPS point.</p>
+    <div class="err">Household ${formH} is not registered.</div>
+    <div class="acts">
+      <button class="btn btn-ghost" onclick="closeModal()">Not now</button>
+      <button class="btn btn-primary" onclick="gpsStep()">Try again</button>
+    </div>`);
+}
+function finish(gps){
+  const d=formD,h=formH;
+  const rec=Object.assign({},form,{
+    _id:me+'-D'+d+'-H'+h,          /* stable — a resubmission updates this row */
+    _hhr:me, _day:d, _hh:h, _serial:hhSerial(d,h),
+    token:form._token, itns:itnsFor(form.size),
+    gpsLat:gps.lat, gpsLng:gps.lng, gpsAcc:gps.acc, gpsAt:gps.at,
+    _rev:1, _submitted:false, _dirty:false, _submittedAt:'',
+    _ts:new Date().toISOString()
+  });
+  delete rec._token;
+  if(rec.hhrPhone) Store.set('itn_hhr_phone_'+me,rec.hhrPhone);
+  recSet(d,h,rec);
+  setDone(d,h,true);
+  closeModal();
+  const nx=nextHH(d);
+  const full=dayComplete(d);
+  modal(`<h3>Household ${h} registered</h3>
+    <div class="tok-show">${esc(rec.token)}</div>
+    <p style="margin-top:12px">${esc(rec.first+' '+rec.last)} \u00b7 ${rec.size} people \u00b7 ${rec.itns} ITN${rec.itns===1?'':'s'} \u00b7 ${rec.u5} under-five${Number(rec.u5)===1?'':'s'}</p>
+    <div class="gps-ok">GPS recorded \u00b7 ${gps.lat}, ${gps.lng} (\u00b1${gps.acc} m)</div>
+    ${full?`<div class="sync-bar warn" style="margin:13px 0 0"><span class="d"></span>
+        <div class="t"><b>Day ${d} is finished.</b><br>Submit its ${PER_DAY} records now.</div></div>`:''}
+    <div class="acts">
+      ${full?`<button class="btn btn-ghost" onclick="closeModal();renderDay(${d})">Later</button>
+              <button class="btn btn-ok" onclick="closeModal();submitDay(${d})">Submit Day ${d}</button>`
+            :`<button class="btn btn-ghost" onclick="closeModal();renderDay(${d})">Day ${d}</button>
+              <button class="btn btn-ok" onclick="closeModal();openHH(${d},${nx})">Household ${nx}</button>`}
+    </div>`);
+}
+
+/* ---------- a household already registered ---------- */
+function renderSaved(){
+  const d=formD,h=formH,r=recGet(d,h)||{};
+  const row=(k,v)=>`<div class="rv-item"><span class="q">${esc(k)}</span><span class="a">${esc(v===''||v==null?'\u2014':v)}</span></div>`;
+  const contact = r.hasPhone==='Yes' ? r.phone+' (household head)'
+    : r.hasAlt==='Yes' ? r.altPhone+' (someone else)'
+    : r.hhrPhone ? r.hhrPhone+' (HHR)' : '\u2014';
+  app.innerHTML=`<div class="appbar">
+      <button class="ico-btn" onclick="renderDay(${d})">${I.back}</button>
+      <div class="titles"><div class="eyebrow">${esc(me)} \u00b7 Day ${d}</div><div class="title">Household ${h} \u00b7 registered</div></div>
+      <span class="tag-pill me">${hhSerial(d,h)}/${DAYS*PER_DAY}</span>
+    </div>
+    <div class="body"><div class="list">
+      <div class="hd-head"><div class="id">${esc(r.token||'')}</div>
+        <div class="meta">${esc((r.first||'')+' '+(r.last||''))}<br>Registered ${esc(String(r._ts||'').slice(0,16).replace('T',' '))}</div></div>
+      ${r._submitted&&!r._dirty
+        ? `<div class="sync-bar ok"><span class="d"></span><div class="t"><b>Submitted to NMDR.</b>${r._rev>1?' Revision '+r._rev+'.':''}</div></div>`
+        : r._submitted&&r._dirty
+        ? `<div class="sync-bar warn"><span class="d"></span><div class="t"><b>Changed since it was submitted.</b><br>Resubmit Day ${d} so NMDR gets revision ${r._rev}.</div>
+             <button class="btn btn-primary btn-sm" style="flex:0 0 auto" onclick="submitDay(${d})">Resubmit</button></div>`
+        : `<div class="sync-bar wait"><span class="d"></span><div class="t"><b>Registered, not yet submitted.</b><br>${dayComplete(d)?'Day '+d+' is finished — submit its records.':'It goes up when all '+PER_DAY+' households of Day '+d+' are done.'}</div></div>`}
+      <div class="flag ok">Registered.${h<PER_DAY?' Household '+(h+1)+' is open.':' Day '+d+' is complete.'}</div>
+      <div class="card" style="padding-top:6px">
+        ${row('Household head',(r.first||'')+' '+(r.last||''))}
+        ${row('Contact number',contact)}
+        ${row('People in household',r.size)}
+        ${row('ITNs to be given',r.itns)}
+        ${row('Under-fives',r.u5)}
+        ${row('Token',r.token)}
+        ${row('GPS',r.gpsLat?r.gpsLat+', '+r.gpsLng+' (\u00b1'+r.gpsAcc+' m)':'not recorded')}
+        ${row('Revision',r._rev||1)}
+      </div>
+    </div></div>
+    <div class="footer">
+      <button class="btn btn-ghost btn-sm" onclick="editHH()">Edit</button>
+      ${needsSend(r)
+        ? `<button class="btn btn-ok" onclick="submitOne(${d},${h})">${r._submitted?'Resubmit this record':'Submit this record'}</button>`
+        : `<button class="btn btn-primary" onclick="renderDay(${d})">Back to Day ${d}</button>`}
+    </div>`;
+}
+/* One record on its own — for when a household fails in the day batch, or an
+   edit needs to reach NMDR without waiting for the rest of the day. */
+function submitOne(d,h){
+  if(!GAS_URL){ setGAS(); return; }
+  const rec=recGet(d,h);
+  if(!rec){ toast('Nothing to submit'); return; }
+  if(!needsSend(rec)){ toast('Household '+h+' is already submitted'); return; }
+  if(!navigator.onLine){ modal(`<h3>No internet</h3>
+    <p>Household ${h} is safe on this device. Connect and submit again.</p>
+    <div class="acts"><button class="btn btn-primary" onclick="closeModal()">Close</button></div>`); return; }
+  modal(`<h3>Submitting household ${h}</h3><div class="spin"></div>
+    <p style="text-align:center">${esc(rec.token||'')}</p>`);
+  sendRec(rec,(ok,status)=>{
+    if(ok){ rec._submitted=true; rec._dirty=false; rec._submittedAt=new Date().toISOString(); }
+    else rec._lastError=status||'failed';
+    saveRecs();
+    const left=dayToSend(d).length;
+    modal(`<h3>${ok?'Household '+h+' submitted':'Could not submit household '+h}</h3>
+      <div class="tok-show">${esc(rec.token||'')}</div>
+      ${ok?`<div class="gps-ok" style="margin-top:12px">In NMDR${rec._rev>1?' as revision '+rec._rev:''}.${left?' '+left+' other record'+(left===1?'':'s')+' still to send for Day '+d+'.':''}</div>`
+          :`<div class="err" style="margin-top:12px">${esc(status==='network'||status==='timeout'?'The connection failed. It stays on this device \u2014 try again.':'The server refused it ('+(status||'error')+').')}</div>`}
+      <div class="acts">
+        <button class="btn btn-ghost" onclick="closeModal();renderSaved()">Close</button>
+        ${ok?(left?`<button class="btn btn-primary" onclick="closeModal();submitDay(${d})">Send the other ${left}</button>`
+                  :`<button class="btn btn-ok" onclick="closeModal();renderDay(${d})">Day ${d}</button>`)
+            :`<button class="btn btn-primary" onclick="closeModal();submitOne(${d},${h})">Try again</button>`}
+      </div>`);
+  });
+}
+
+/* ---------- start ---------- */
+if(me&&CREDS[me]){ loadDone(); renderMenu(); } else { me=null; renderHHRs(); }
+</script>
+</body>
+</html>
