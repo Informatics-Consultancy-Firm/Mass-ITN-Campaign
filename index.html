@@ -280,15 +280,17 @@
    ITN Household Registration — HHR app
    HHR01 … HHR100 · 10 days · 25 households per day
    ========================================================= */
-const APP_VERSION='2026.07.30e';
+const APP_VERSION='2026.07.30f';
 
 /* =========================================================
-   BACKEND — paste the Google Apps Script /exec URL here, or use
-   "Connect NMDR" on the days screen. Records are keyed on
-   _id and UPSERTED, so a resubmitted record updates its own row
-   instead of creating a second one.
+   BACKEND — the deployed submission endpoint. It is baked in, so a
+   registrar never has to paste anything; "Connect NMDR" is only there
+   if the endpoint is ever redeployed (a new deployment gets a new URL).
+   Records are keyed on _id and UPSERTED, so a resubmitted record
+   updates its own row instead of creating a second one.
+   Sheet: 12DDjaTzgyb_6IjEYgMX7LWxnrTaACKliJ5FnHIDSYsw · tab Registrations
    ========================================================= */
-let GAS_URL="";
+let GAS_URL="https://script.google.com/macros/s/AKfycbwxbWj6ybkTdCJucFEbK9DStG1CufHL89939SrEEbSJC5AmwFKjpJ9knFhJbRKmvVIr/exec";
 const HHR_COUNT=100;      /* HHR01 … HHR100 */
 const DAYS=10;            /* Day 1 … Day 10 */
 const PER_DAY=25;         /* households per HHR per day */
