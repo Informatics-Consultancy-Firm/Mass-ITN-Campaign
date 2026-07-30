@@ -78,6 +78,7 @@
 
   /* ---- shared card grid (HHRs, days, households) ---- */
   .grid{display:grid;gap:10px;}
+  .grid.g1{grid-template-columns:1fr;}
   .grid.g2{grid-template-columns:1fr 1fr;}
   .grid.g3{grid-template-columns:1fr 1fr 1fr;}
   .grid.g4{grid-template-columns:repeat(4,1fr);}
@@ -88,6 +89,10 @@
   .tile .tb{font:700 8.5px/1 var(--body);letter-spacing:.05em;text-transform:uppercase;padding:5px 6px;border-radius:99px;}
   .tile .top{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:9px;}
   .tile .tk{font:500 10px/1.3 var(--body);color:var(--muted);}
+  .tile .tn.small{font-size:12.5px;line-height:1.2;letter-spacing:.01em;}
+  .tile .tb.code{background:var(--sky-50);border:1px solid var(--sky-200);color:var(--sky-700);font-family:var(--disp);letter-spacing:.05em;}
+  .crumb{font:500 10.5px/1.4 var(--body);color:var(--muted);margin:0 2px 10px;}
+  .crumb .cs{color:var(--sky-300);margin:0 6px;}
   .tile .ttrack{height:6px;background:var(--sky-50);border:1px solid var(--line);border-radius:99px;overflow:hidden;margin-top:8px;}
   .tile .tfill{height:100%;border-radius:99px;background:linear-gradient(90deg,var(--sky-400),var(--sky-600));}
   .tile .tfill.full{background:var(--ok);}
@@ -166,7 +171,6 @@
     cursor:pointer;box-shadow:var(--sh-sm);overflow:hidden;transition:transform .12s,box-shadow .2s;}
   .menu-card:active{transform:scale(.985);}
   .menu-card:hover{box-shadow:var(--sh-md);}
-  .menu-card::after{content:"";position:absolute;right:-40px;top:-46px;width:132px;height:132px;border-radius:50%;background:var(--sky-50);}
   .menu-card .mi{position:relative;width:54px;height:54px;border-radius:17px;display:grid;place-items:center;flex:0 0 auto;}
   .menu-card .mi.b{background:var(--sky-100);color:var(--sky-600);}
   .menu-card .mi.g{background:var(--ok-bg);color:var(--ok);}
@@ -280,7 +284,7 @@
    ITN Household Registration — HHR app
    HHR01 … HHR100 · 10 days · 25 households per day
    ========================================================= */
-const APP_VERSION='2026.07.30f';
+const APP_VERSION='2026.07.30i';
 
 /* =========================================================
    BACKEND — the deployed submission endpoint. It is baked in, so a
@@ -291,19 +295,46 @@ const APP_VERSION='2026.07.30f';
    Sheet: 12DDjaTzgyb_6IjEYgMX7LWxnrTaACKliJ5FnHIDSYsw · tab Registrations
    ========================================================= */
 let GAS_URL="https://script.google.com/macros/s/AKfycbwxbWj6ybkTdCJucFEbK9DStG1CufHL89939SrEEbSJC5AmwFKjpJ9knFhJbRKmvVIr/exec";
-const HHR_COUNT=100;      /* HHR01 … HHR100 */
 const DAYS=10;            /* Day 1 … Day 10 */
 const PER_DAY=25;         /* households per HHR per day */
+const HHR_PER_PHU=2;      /* registrars attached to each PHU */
 
-/* ---------- credentials ----------
-   One row per HHR. Every account is admin / admin for now — replace the
-   u and p values here when the real per-HHR credentials are issued. */
-const CREDS={};
-for(let i=1;i<=HHR_COUNT;i++){
-  CREDS[hhrId(i)]={u:'admin', p:'admin'};
-}
-function hhrId(i){ return 'HHR'+String(i).padStart(2,'0'); }
-function hhrNum(id){ return parseInt(String(id).replace(/\D/g,''),10); }
+/* =========================================================
+   WHERE THE REGISTRARS SIT
+   District (15, Western Area Urban excluded) > chiefdom > PHU > HHR.
+   Taken from the DHIS2 facility list: 15 districts, 200 chiefdoms,
+   1,565 PHUs. Format: [districtCode, districtName, [[chiefdom,[PHU,…]],…]]
+   ========================================================= */
+const HIER=[["BO","Bo",[["Bo City",["Aethel CHP","Agape Way CHP","Anglican Diocese Clinic","Batiama Layout MCHP","Bo Government Hospital","Bo School Bay CHP","Breakthrough MCHP","Brima Town CHP","EDC Unit CHP","Favour MCHP","Gbanja Town MCHP","Gbotima CHP","Genda CHP","Genda MCHP","Gilas Hospital","Haikel CHP","Kakua Static CHC","Kandeh Town CHP","Kindoya Hospital","Kowama (Kakua) CHP","Lewaibu CHP","Lyn Maternity MCHP","Manjiama CHC","Mercy Ships (Bo City) Hospital","Mid Land MCHP","Morning Star CHP","Nafaya MCHP","Needy CHP","New Police Barracks CHC","Praise Foundation CHC","Red Cross (Bo City) CHC","Rescue Health Care Clinic","Simbo Town CHP","Sowa's Clinic","Spllenz Clinic","St Monica's Clinic","Tengbewabu MCHP","Topkoi Town CHP","UNIMUS MCHP","Walk In Medical Associate Clinic","Yemoh Town CHC"]],["Badjia Chiefdom",["Ngelehun (Badjia) CHC","Njagbahun (Badjia) MCHP","Njandama MCHP"]],["Bagbwe Chiefdom",["Barlie MCHP","Benduma (Bagbwe) MCHP","Kondiama MCHP","Kpetema (Bagbwe) MCHP","Mendewa MCHP","Ngalu CHC","Samie Buma MCHP"]],["Baoma Chiefdom",["Baoma Station CHP","Blamawo MCHP","Faabu CHP","Foindu (Baoma) MCHP","Gbahama (Baoma) CHP","Gerehun CHC","Golu MCHP","Jan Christian Helvings Clinic","Jembe CHC","Jormu (Baoma) MCHP","Kigbai MCHP","Kpunbu MCHP","Mbundorbu MCHP","Pelewahun (Baoma) MCHP","Tugbebu CHP","Yakaji MCHP","Yamandu CHC"]],["Bargbo Chiefdom",["Bum Kaku MCHP","Gbangbalia MCHP","Jimmi CHC","Kakama MCHP","Kasse MCHP","Limba CHP","Mano Yorgbo MCHP","Momajo CHP","Niagorehun (Bargbo) CHP","Senehun Ngolan MCHP"]],["Bongor Chiefdom",["Gbaama MCHP","Lowoma (Bongor) MCHP","Mamboma (Bongor) CHC","Telu CHC"]],["Bumpe Ngao Chiefdom",["Bongor (Bumpe Ngao) MCHP","Buma MCHP","Bumpe CHC","Kabiyama MCHP","Kaniya MCHP","Kpetema (Bumpe Ngao) CHP","Makayonie MCHP","Mokoba MCHP","Mokpende MCHP","Ngolahun (Bumpe Ngao) CHC","Niagorehun Vaakie MCHP","Sahn (Bumpe Ngao) CHP","Serabu (Bumpe Ngao) CHC","Serabu Mission Hospital","Taninahun (Bumpe Ngao) CHP","Walihun (Bumpe Ngao) MCHP","Yengema (Bumpe Ngao) MCHP"]],["Gbo Chiefdom",["Gbaiima CHC","Sembehun Mamagewoh CHC"]],["Jaiama Chiefdom",["Koribondo CHC","Mano-Jaiama CHP","Niayahun CHP"]],["Kakua Chiefdom",["Bandajuma MCHP","Bo Childrens Hospital","Egyptian (Bo) Clinic","Fengehun MCHP","Fullawahun MCHP","Gbongboma MCHP","Gender CHP","Keindeyella MCHP","Maguama CHP","Mamasa Life Saving Hospital","Manjiama CHC","Marie Stopes (Kakua) Clinic","Massah Memorial Maternity MCHP","Ndegbomie MCHP","Nduvuibu MCHP","United Methodist Church Manjama CHC","Veronical MCHP"]],["Komboya Chiefdom",["Gumahun MCHP","Komboya Gbauja MCHP","Kpamajama MCHP","Mano (Komboya) MCHP","Niagorehun (Komboya) MCHP","Njala (Komboya) CHC","Teibor CHP"]],["Lugbu Chiefdom",["Bontiwo MCHP","Feiba CHP","Hima MCHP","Karleh MCHP","Kpetewoma CHP","Ngieyehun MCHP","Sumbuya (Lugbu) CHC","Upper Saama MCHP","Yambama CHP"]],["Niawa Lenga Chiefdom",["Korbu MCHP","Nengbema CHP","Ngogbebu MCHP","Pendebu MCHP","Sahn (Niawa Lenga) CHC"]],["Selenga Chiefdom",["Damballa CHC","Gbangba MCHP"]],["Tikonko Chiefdom",["Gondama (Tikonko) CHC","Griema MCHP","Haikal CHP","Kassama MCHP","Mattru on the Rail MCHP","Mendewa 2 Clinic","Mendewa CHP","Sebehun Tarbay MCHP","Sembehun 17 (Tikonko) CHP","Theresa Hakim CHP","Tikonko (Bo) CHC","Towama MCHP","Veronica MCHP","We Care Health Centre Clinic","Zion CHC"]],["Valunia Chiefdom",["Baomahun CHC","Foya (Valunia) CHP","Grima (Valunia) CHP","Kenema Blango CHC","Kpewama MCHP","Kpuabu MCHP","Mongere CHC","Ngolahun Jabaty CHP","Pujehun (Valunia) CHP"]],["Wonde Chiefdom",["Bathurst MCHP","Fanima (Wonde) MCHP","Gboyama CHC","Kambawama MCHP"]]]],["BOM","Bombali",[["Biriwa Chiefdom",["Bumban CHP","Bumbanday MCHP","Kagbaneh CHC","Kagbankona MCHP","Kakorla MCHP","Kamabai CHC","Kamasikie CHP","Kamathudgu MCHP","Kanikay MCHP","Karina CHP","Kathakeya CHP","Kayainkassa CHP","Kayonkoro CHP","Manjoro MCHP","Waridala Clinic"]],["Bombali Sebora Chiefdom",["Arab (Makeni) Clinic","Maboleh CHP","Maforay (Bombali Sebora) CHP","Makama CHP","Makump CHP","Masory CHP","Pate-Bana Masimbo CHP","Patebana CHC","Rescue International (Bombali Sebora) Clinic","Robat CHP"]],["Bombali Serry Chiefdom",["Manonkoh Clinic","Rokonta CHC"]],["Gbanti (Bombali) Chiefdom",["Kunsho CHP","Panlap CHP","Stocco CHP","Yoni (Gbanti) CHP"]],["Gbendembu Chiefdom",["Gbendembu CHC","Kortohun MCHP","Madina Loko CHP","Mamaka (Gbendembu) MCHP","Mambala MCHP"]],["Kamaranka Chiefdom",["Kamaranka CHC","Makaiba MCHP","Makassa MCHP","Rosint MCHP","Royeama CHP"]],["Magbaimba Ndohahun Chiefdom",["Hunduwa MCHP","Kagbere CHC","Mambiama MCHP","Manjaka MCHP"]],["Makarie Chiefdom",["Fullah Town 1 (Makarie) CHP","Karefay Themne CHP","Kerefay Loko MCHP","Kolisokoh CHP","Mabayo MCHP","Magbaikoli MCHP","Magbenteh Hospital","Makarie MCHP","Mangay Loko MCHP","Marie Stopes (Makarie) Clinic","Masongbo (Makarie) CHC","Mateneh MCHP","Punthun MCHP","Thonkoba CHP","Yainkassa CHP"]],["Mara Chiefdom",["Kiampkakolo MCHP","Manewa MCHP","Mara CHC"]],["Ngowahun Chiefdom",["Kalangba (Ngowahun) CHC","Maharie CHP","Makiteh (Ngowahun) MCHP","Masongbo Loko CHP","Tambiama CHP"]],["Paki Masabong Chiefdom",["Kathanta Bana CHP","Kathekeya Kaboli CHP","Makeni Lol MCHP","Makolor CHP","Mapaki CHC","Masabong Pil MCHP","Masingbi Lol MCHP"]],["Safroko Limba Chiefdom",["Binkolo CHC","Kabombeh MCHP","Kabonka MCHP","Kagbo MCHP","Kapethe MCHP","Kateneh MCHP","Kayasie CHP","Mabonkani MCHP","Maselleh MCHP","Masongbo Limba MCHP"]],["Makeni City",["Bombali Police CHC","Branda Medical Centre Hospital","Caring Hands Clinic","City Garden Clinic","Fullah Town 2 (Makeni City) CHP","Hamanda Clinic","Happy Kid and Adolescent (Makeni City) Clinic","Holy Spirit Hospital","Holy Spirit Mobile Clinic","Loreto Clinic","Makeni Correctional Centre Clinic","Makeni Government Hospital","Masuba Clinic","Modern Clinic","Mordan Clinic","New Hope Hospital","Red Cross (Makeni City) CHP","Sanda Clinic","Stocco Leprosy and TB Hospital","Teko Barracks CHP","Tonko CHP"]]]],["BON","Bonthe",[["Bendu-Cha Chiefdom",["Bendu (Bendu-Cha) CHC","Foya (Bendu-Cha) CHP","Giebina CHP","Mindohun MCHP","Mo-Davies CHP","Taigbe CHP"]],["Bum Chiefdom",["Karlleh MCHP","Madina (Bum) CHC","Mammy CHP","Ngepehun CHP","Ngessehun MCHP","Sogballeh MCHP","Tassor CHP","Torma Bum CHP"]],["Dema Chiefdom",["Bumpetoke (Dema) CHP","Mbaoma (Dema) CHP","Tissana (Dema) CHC","Tombay CHP"]],["Imperi Chiefdom",["Gaindema CHP","Gbamgbaia CHC","Gbamgbama CHC","Jangallor CHP","Junctionla MCHP","Mo-Kepay CHP","Mogbwemo CHC","Mokaba MCHP","Moriba Town (Imperri) CHC","Mount Hope Hospital","Sierra Rutile Hospital","Victoria MCHP","Yargoi CHP"]],["Jong Chiefdom",["Barbar MCHP","Gambia CHC","Gbaninga CHP","Henry Kormoi Community Hospital","Jorma CHP","Kabati CHP","Komende (Jong) MCHP","Mattru CHC","Mattru UBC Hospital","Mo-Savie MCHP","Mogbwe MCHP","Mongerewa MCHP","Moyowa MCHP","Red Cross (Mattru) CHP","Segbwema (Jong) CHP","Semabu (Jong) CHP","Tissana (Jong) CHP"]],["Kpanda Kemoh Chiefdom",["Gambia Popayma MCHP","Gbongeh MCHP","Lawana (Kpanda Kemo) MCHP","Mottuo CHC","Senjehun MCHP"]],["Kwamebai Krim Chiefdom",["Benduma CHC","Hoya CHP","Massah Kpoanguma CHP","Mosenteh CHP","Tei CHP","Topain CHP"]],["Nongoba Bullom Chiefdom",["Batahall CHP","Gbamani CHP","Gbap CHC","Maamu MCHP","Mbaoma Kpengeh CHC","Mbaoma Kpengeh CHP","Minah CHP","Ngaringa MCHP","Sembehun (Nongoba Bullom) MCHP","Subu MCHP","Torma Gbagba CHP","Waiba MCHP"]],["Sittia Chiefdom",["Delken CHC","Delken MCHP","Mania MCHP","Mbokie MCHP","Mo-Sandi CHP","Ngepay CHP","Sanhaya CHP","Yoni (Sittia) CHC"]],["Sogbini Chiefdom",["Grima (Sogbini) CHP","Kanga (Sogbini) MCHP","Kpetema (Sogbini) MCHP","Mandu CHP","Ngueh MCHP","Tihun CHC"]],["Yawbeko Chiefdom",["Mobefa MCHP","Sargor CHP","Senehun Gbloh MCHP","Talia (Yawbeko) CHC","Tuakan CHP"]],["Bonthe Town",["Bonthe Government Hospital","Bonthe Under Fives Clinic","Red Cross (Bonthe) CHP","St Joseph's Clinic","York Island CHP"]]]],["FAL","Falaba",[["Barawa Wollay Chiefdom",["Banadakafaia CHP","Bandakoro MCHP","Firawa CHC","Konombaia CHP","Kulanko MCHP"]],["Delmandugu Chiefdom",["Deldu Kamaron MCHP","Mansadu CHC","Masadu CHC","Mongo Kamaron CHP","Seremudu MCHP","Tambalia Balia MCHP"]],["Dembelia-Sinkunia Chiefdom",["Fullamansa MCHP","Gbindi CHP","Manna MCHP","Sinkunia CHC"]],["Folosaba Dembelia Chiefdom",["Dogoloya CHP","Koromasilaia MCHP","Largo MCHP","Musaia (Dembelia) CHC"]],["Folosaba Kamba Chiefdom",["Gbentu CHC","Hamdalia MCHP","Kalia MCHP","Kamba Mamudia CHP"]],["Kabelia Chiefdom",["Ganya CHP"]],["Kamadugu Yiraia Chiefdom",["Dankawalie CHC","Kamadu Badala MCHP","Kamadu Sokuralla CHP","Yiraia CHP"]],["Kulor Saradu Chiefdom",["Bandapirie CHP","Durukoro MCHP","Kulia CHP","Yarawadu MCHP"]],["Mongo Chiefdom",["Mongo Bendugu CHC","Mongo Karifaia MCHP","Seria CHP","Walia MCHP"]],["Morifindu Chiefdom",["Gberefeh MCHP","Kombili CHP","Serekolia CHC","Tubah MCHP"]],["Neya Chiefdom",["Banboria MCHP","Kurubonla CHC","Mansofinia CHP","Porpon MCHP"]],["Nyedu Chiefdom",["Bumbukoro CHC","Masonia MCHP"]],["Sulima Chiefdom",["Falaba CHC","Gberia Timbakor CHP","Kaliyereh MCHP","Koindu Kura CHP","Sonkoya MCHP"]]]],["KAI","Kailahun",[["Dea Chiefdom",["Baiwala CHP","Nagbena CHP","Sienga CHP"]],["Jahn Chiefdom",["Gbeika CHP"]],["Jawei Chiefdom",["Bombohun MCHP","Daru CHC","Kambama CHP","Kortuma MCHP","Mamabu CHP","Njala-Grima CHP","Nyeama CHP","Pellie CHP","Pewama CHP","SWAKAB (Jawei) Clinic"]],["Kissi Kama Chiefdom",["Dia CHC","Foidu CHP"]],["Kissi Teng Chiefdom",["Bayama (Kissi Teng) CHP","Kangama (Kissi Teng) CHP","Koindu CHC"]],["Kissi Tongi Chiefdom",["Buedu CHC","Dawa CHP","Gbandiwulo CHP","Madopolahun CHP","Sandia (Kissi Tongi) MCHP","Voahun CHP","Weh CHP"]],["Luawa Chiefdom",["Bandajuma Sinneh MCHP","Baoma (Luawa) CHP","Dodo-Kortuma CHP","Gbalahun CHP","Gbeworbu Gao CHP","Giema (Luawa) CHP","Jengbellu CHP","Kailahun Government Hospital","Konjo (Luawa) CHP","Kpandebu (Luawa) MCHP","Luawa Under Fives CHC","Madina (Luawa) MCHP","Mano-Sewalu CHP","Marie Stopes (Luawa) Clinic","Mende Buima MCHP","Morfindor CHP","Ngiehun (Luawa) CHP","Nyandehun (Luawa) CHP","Sandeyallu CHP","Sengema (Luawa) CHP","Talia (Luawa) MCHP"]],["Malema Chiefdom",["Bumpeh (Malema) CHP","Fobu CHP","Jojoima CHC","Madina (Malema) CHP","Njama (Malema) MCHP"]],["Mandu Chiefdom",["Baiima CHP","Levuma (Mandu) CHP","Mobai CHC","Yoyah CHP"]],["Njaluahun Chiefdom",["Bandajuma Kpolihun CHP","Dambu CHC","Daru Field Hospital Clinic","Follah MCHP","Laleihun (Njaluahun) CHP","Mano-Menima CHP","Niahun Gbuyama CHP","Nixon Hospital","Nixon Under Fives CHC","Njaluahun Military Hospital","Nyandehun Nguvoihun CHP","Pendembu-Njeigbla CHP","Segbwema (Njaluahun) MCHP"]],["Peje Bongre Chiefdom",["Gbahama (Peje Bongre) CHP","Grima MCHP","Mamboma (Peje Bongre) CHP","Manowa CHC","Ngolahun MCHP","Pujehun (Peje Bongre) CHP"]],["Peje West Chiefdom",["Bunumbu CHC","El-Shaddai (Peje West) Clinic","Jokibu CHP","Peje Baoma CHP","Pejewa (Peje West) CHP"]],["Penguia Chiefdom",["Kono-Bendu CHP","Lalehun CHP","Sandaru (Penguia) CHC","Woroma CHP"]],["Upper Bambara Chiefdom",["Bomaru CHP","Hand Maid Clinic","Jenneh MCHP","Mendekelema (Upper Bambara) CHP","Pendembu (Upper Bambara) CHC","Siama (Upper Bambara) CHP"]],["Yawei Chiefdom",["Bandajuma CHC","Bendu CHP","Kwellu-Ngieya CHP","Macca CHP","Malema (Yawei) CHP","Massayeima CHP"]]]],["KAM","Kambia",[["Bramaia Chiefdom",["Gbolon MCHP","Kanku Bramaia MCHP","Kukuna CHC","Shekaia MCHP"]],["Dixon Chiefdom",["Fodaya MCHP","Mafaray CHP"]],["Gbinleh Chiefdom",["Gbalamuya CHC","Madamaya Good Grace Clinic","Magbengbeh MCHP","Tawuya MCHP","Worreh MCHP"]],["Konimaka Chiefdom",["Barakuya MCHP","Konta (Bramaia) CHP"]],["Magbema Chiefdom",["Ahmadiyya Mission Clinic","Arab (Magbema) Clinic","Barmoi Luma CHP","Dibia CHP","Gbonkomaria CHP","Kamba MCHP","Kambia Government Hospital","Magbema Under Fives Clinic","Magbethy MCHP","Mathuraneh MCHP","Menicurve MCHP","Mile 18 MCHP","Modia MCHP","Red Cross (Magbema) CHP","Rokupr CHC","Senthai MCHP","Wullah Thenkle MCHP"]],["Mambolo Chiefdom",["Kalainkay MCHP","Macoth MCHP","Mambolo (Kambia) CHC","Mayakie MCHP","Rokel (Mambolo) MCHP","Romando MCHP","Rotain Bana CHP","Tombo Wallah CHP"]],["Masumgbala Chiefdom",["Kania CHC","Kawula CHC"]],["Munu Thalla Chiefdom",["Banka Makuloh MCHP","Barmoi Munu CHC","Gbalan Thallan MCHP"]],["Samu Chiefdom",["Bapuya CHP","Kangbor MCHP","Kassirie CHC","Kortimoh MCHP","Koya (Samu) MCHP","Kychom CHC","Mafufuneh CHC","Mange Bissan MCHP","Mapotolon CHC","Moribaya MCHP","Rokai MCHP","Rosinor CHP","Soriebolomia MCHP","Yelieboya CHP"]],["Tonko Limba Chiefdom",["Bubuya MCHP","Kamagbewu MCHP","Kamassasa CHC","Kamawala MCHP","Kasoria CHP","Katherie MCHP","Layia Gboray CHP","Madina (Tonko Limba) CHC","Madina Wesleyan Clinic","Masaralie MCHP","Masselleh CHP","Masunthun CHP","Mile 14 CHP","Numea CHP","Samaia MCHP","Sellah Kafta MCHP","Timbo MCHP","Yebaya MCHP"]]]],["KAR","Karene",[["Buya Chiefdom",["Kamasondo CHC","Manumtheneh MCHP","Masamboi MCHP","Rosint Buya MCHP"]],["Dibia Chiefdom",["Gbinti CHC","Gbombana MCHP","Magborognor MCHP","Roctolon MCHP","Rogballan (Dibia) CHP"]],["Gbanti (Karene) Chiefdom",["Borongoh Makarankay MCHP","Gbainkfay MCHP","Gbanti CHP","Gbinti Maria MCHP","Gbonkobana MCHP","Kambia CHP"]],["Gormbahun Chiefdom",["BatKanu CHC","Kiamunday MCHP","Magbaingba MCHP","Matoto MCHP"]],["Mafonda Makerembay Chiefdom",["Gbonkonka MCHP","Rochain Loko CHP"]],["Romende Chiefdom",["Foredugu MCHP","Gbomsamba MCHP","Mabureh Mende MCHP","Rokamba MCHP","Worreh Bana MCHP"]],["Safroko Chiefdom",["Maron CHP"]],["Sanda Loko Chiefdom",["Kamalo CHC","Laiya MCHP","Laminaya CHP","Madina Fullah MCHP","Maharibo CHP","Marcorba Loko MCHP","Mayolla CHP","Rochain Salcost CHP","Rothatha MCHP"]],["Sanda Magbolonthor Chiefdom",["Gbogbodo MCHP","Kantia MCHP","Komneh CHP","Magbolonthor MCHP","Sendugu CHC"]],["Sanda Tendaren Chiefdom",["Mabunduka CHC","Malontho MCHP","Manack MCHP","Mateboi CHC","Rogbin MCHP","Rokulan CHC","Royanka Lol CHP"]],["Sella Limba Chiefdom",["Kabba Ferry CHP","Kagboray MCHP","Kamabaio MCHP","Kamakwie CHP","Kamakwie Wesleyan Hospital","Kamawornie MCHP","Kaponkie MCHP","Kathanta Yimbor CHC","Masankorie CHP"]],["Tambaka Simibungie Chiefdom",["Komoya CHP","Samaya MCHP"]],["Tambaka Yobangie Chiefdom",["Dombaya CHP","Fintonia CHC","Sanya MCHP"]]]],["KEN","Kenema",[["Kenema City",["African Muslim Agency Clinic","Ahmadiyya Muslim (Nongowa) Hospital","BL Services Clinic","Burma 2 MCHP","Degbuama MCHP","Direct Aid Orphanage (Kenema City) Clinic","Egyptian (Kenema City) Clinic","Ensah Foundation Clinic","Friends For Lives Clinic","Gbo-Kakajama 1 MCHP","Gbo-Kakajama 2 MCHP","Gbo-Lambayama 1 CHC","Gbo-Lambayama 2 MCHP","Kenema City Military Clinic","Kenema Government Hospital","Kenema Under Fives CHP","Kondebotihun MCHP","Koyagbema MCHP","Kpayama 1 MCHP","Kpayama 2 MCHP","Kpetema (Kenema City) CHC","Lango Town MCHP","Malian Friendship Hospital","Marie Stopes (Kenema City) Clinic","Nongowa Static MCHP","Nyandeyama MCHP","Rainbow Clinic","Red Cross (Kenema City) CHP","Samai Town CHC","Torkpombu MCHP"]],["Dama Chiefdom",["Diamei MCHP","Gao MCHP","Giema (Dama) CHP","Konia (Dama) MCHP","Konjo (Dama) CHP","Kpandebu CHC","Lileima MCHP","Loppa CHP","Majihun MCHP","Patama MCHP","Tawahun MCHP","Tokpombu (Dama) CHP"]],["Dodo Chiefdom",["Dodo CHC","Guala MCHP","Kundorma CHP","Mbowohun CHP"]],["Gaura Chiefdom",["Joru CHC","Kokoru CHP","Mendekelema (Gaura) CHP","Perrie MCHP","Sandaru (Gaura) MCHP","Sembehun (Gaura) MCHP","Tikonko (Gaura) MCHP","Venima CHP"]],["Gorama Mende Chiefdom",["Bambara Kaima CHP","Fomaya CHP","Konta (Gorama Mende) CHP","Kortuhun (Gorama Mende) MCHP","Mondema CHC","Ngiegboiye CHP","Njagbewema (Gorama Mende) MCHP","Punduru CHP","Tungie CHC"]],["Kandu Leppiama Chiefdom",["Baoma Oil Mill CHC","Diema MCHP","Gbado CHP","Levuma (Kandu Leppiama) CHC","Sembehun (Kandu Leppiama) MCHP"]],["Koya (Kenema) Chiefdom",["Baoma (Koya) CHC","Bongor (Koya) MCHP","Jui (Koya) CHP","Menima MCHP","Njaluahun (Koya) MCHP","Nyandehun (Koya) MCHP","Serabu (Koya) CHP"]],["Langroma Chiefdom",["Woyama MCHP","Yabaima CHP"]],["Lower Bambara Chiefdom",["Bomie MCHP","Foindu (Lower Bambara) CHC","Foindu (Lower Bambara) CHP","Kamboma (Lower Bambara) CHC","Kamboma (Lower Bambara) MCHP","Komende Getewalu CHP","Komende Luyema MCHP","Konjo (Lower Bambara) CHC","Konjo (Lower Bambara) MCHP","Kornia Kpindema CHP","Kpandebu (Lower Bambara) CHC","Kpandebu (Lower Bambara) MCHP","Kpetema (Lower Bambara) CHP","Lowoma (Lower Bambara) CHC","Ngiehun (Lower Bambara) CHC","Njagbahun (Lower Bambara) MCHP","Panguma CHC","Panguma Hospital","Pelewahun (Lower Bambara) MCHP","Saama CHP","Sandeyiema MCHP","Sembiema MCHP","Semewabu MCHP","Tongo CHC","Wiema CHC"]],["Malegohun Chiefdom",["Bendu (Malegohun) CHC","Benduma (Malegohun) MCHP","Helegombu MCHP","Ngiehun Konjo CHP"]],["Niawa Chiefdom",["Bandawor MCHP","Gandorhun (Niawa) CHP","Sendumei CHC"]],["Nomo Chiefdom",["Baoma (Nomo) CHP","Damabara MCHP","Faama CHC"]],["Nongowa Chiefdom",["Bambawo MCHP","Hangah CHC","Jormu (Nongowa) CHP","Komende (Nongowa) MCHP","Konabu MCHP","Largo CHC","Massahun MCHP","Medicins Sans Frontiere Hospital","Ngelehun (Nongowa) MCHP","Niahun Buima MCHP","Niekabu CHC","Panderu MCHP","Potehun MCHP","Talia (Nongowa) CHC","Vaahun MCHP"]],["Simbaru Chiefdom",["Boajibu CHC","Gbageima MCHP"]],["Small Bo Chiefdom",["Blama CHC","Doujo CHP","Gelehun MCHP","London (Blama) MCHP","Nyangbe-Bo MCHP","Sarabu CHP","Tobanda CHC"]],["Tunkia Chiefdom",["Belebu CHP","Fayiema CHP","Gbeworbu CHP","Gegbwema CHC","Gorahun CHC","Jao (Tunkia) CHP","Mano Ngiebla CHP","Ngiewahun CHP","Nyiemiga MCHP","Shenge MCHP"]],["Wandor Chiefdom",["Baama CHC","Bambara MCHP","Faala CHP","Gendema MCHP","Kamboma (Wandor) MCHP"]]]],["KOI","Koinadugu",[["Diang Chiefdom",["Badala MCHP","Dalakuru CHP","Diang Kamaron MCHP","Diang Sokurala MCHP","Foria CHP","Kania (Diang) CHP","Kondembaia CHC","Lengekoro CHP","Nyawulia MCHP","Solia MCHP","Waia MCHP","Yara CHP","Yiben MCHP"]],["Gbonkorbor Kayaka Chiefdom",["Kakarima MCHP","Kasassie CHP","Madina Gbonkorbor CHP","Sawuria CHP"]],["Kallian Chiefdom",["Alkalia CHP","Kandeya MCHP","Kumala CHP","Sesawulia MCHP","Tukolie CHP","Worombalia MCHP"]],["Kamukeh Chiefdom",["Kambalia MCHP","Kambia MCHP","Mandia MCHP","Thellia CHP"]],["Kasunko Kakellay Chiefdom",["Fadugu CHC","Kagbasia MCHP","Kassasie Kakeleh MCHP","Madina Kamandie MCHP","Sawuria CHP"]],["Nieni Chiefdom",["Fankoya CHP","Kaya MCHP","Krutor CHP","Mangae MCHP","Safinia MCHP","Sumbaria CHP","Yiffin CHC"]],["Sengbeh Chiefdom",["Arab (Sengbeh) Clinic","Bambukoro CHP","Bambukura MCHP","Gbenikoro MCHP","Koinadugu 2 CHC","Kondeya (Sengbeh) MCHP","Momorimaria MCHP","Nasarah Clinic","Red Cross (Sengbeh) Clinic"]],["Thamiso Chiefdom",["Kamathoi MCHP","Karasa MCHP","Kasanikoro CHP"]],["Wara Wara Bafodia Chiefdom",["Bafodia CHC","Kadanso MCHP","Kakoya MCHP","Karpakie MCHP","Sakuta MCHP","Samamaia MCHP"]],["Wara Wara Yagala Chiefdom",["Arab (Wara Wara Yagala) Clinic","Heremakono CHP","Kabala Government Hospital","Kabala Static CHC","Kayako MCHP","Konkoba MCHP","Mamudia Koro MCHP","Marie Stopes (Kabala) Clinic","Sarakoh MCHP","Senekedugu CHP","Wara Wara Faith Clinic","Yataya CHP"]]]],["KON","Kono",[["Koidu New Sembehun City",["Adama Martha Memorial CHC","Arabic Clinic","Dabundeh Clinic","Egyptian (Koidu) Clinic","Gbongonlekeh Clinic","Gbongonleken Clinic","Hussein Mackie Memorial Hospital","In God Be Truth Clinic","Joanna Enterprise Clinic","Kamadu CHP","Kensay CHP","Kimbadu CHC","Kissi Bona CHP","Koakoyima CHC","Koeyor CHP","Koidu Government Hospital","Koidu Static CHC","Koidu Static CHP","Marie Stopes (Koidu) Clinic","Obama Clinic","Paul Sorie Farma's Hospital","Pessima Clinic","Simbakoro MCHP","Small Sefadu CHP","White House Clinic"]],["Fiama Chiefdom",["Bandasuma (Fiama) CHP","Bombordu CHP","Gbetema (Fiama) MCHP","Njagbwema (Fiama) CHC","Yekior MCHP"]],["Gbane Chiefdom",["Bandama (Gbane) MCHP","Fembedu CHP","Foindu (Gbane) CHP","Gandorhun (Gbane) CHC","Kanekor MCHP","Kuangor MCHP","Mbaoma (Gbane) CHP","Sunga MCHP"]],["Gbane Kandor Chiefdom",["Koardu CHC","Sindadu MCHP"]],["Gbense Chiefdom",["Boroma CHP","Gbangadu MCHP","Koakor MCHP","Musa and Family CHC","Quidadu MCHP","Small Sefadu CHP","Well Body Clinic"]],["Gorama Kono Chiefdom",["Bunabu CHP","Kangama (Gorama Kono) CHC","Njagbwema (Gorama Kono) CHP","Torkpumbu MCHP"]],["Kamara Chiefdom",["Peyima CHP","Samiquidu MCHP","Sukudu (Kamara) CHP","Tombodu CHC"]],["Lei Chiefdom",["Foakor MCHP","Gbongongor MCHP","Kenewa MCHP","Koima (Lei) MCHP","Komba Yendeh CHC","Kongoifeh CHP","Kulunbaya CHP","Kunundu MCHP","Saiama (Lei) CHP"]],["Mafindor Chiefdom",["Kamiendor CHC","Kamiendor MCHP","Koindu-Kuteh MCHP","Sambaya (Mafindor) CHP"]],["Nimikoro Chiefdom",["Aiah Mass Clinic","Ashley Clinic","Bumpeh (Nimikoro) CHC","Bumpeh (Nimikoro) CHP","Gondama (Nimikoro) MCHP","Jaiama CHC","Mansundu (Nimikoro) MCHP","Motema CHC","Ngaiya MCHP","Njagbwema (Nimikoro) CHC","Njagbwema (Nimikoro) CHP","Njala (Nimikoro) CHC","Seidu MCHP","Senjekoro MCHP","Tongorma MCHP","United Methodist Church Jaiama Clinic","Yengema (Nimikoro) CHC"]],["Nimiyama Chiefdom",["Condama CHP","Jaiama Sewafe CHC","Massabendu MCHP","Ngo Town CHP","Peya MCHP","Sandia (Nimiyama) MCHP","Walihun (Nimiyama) MCHP"]],["Sandor Chiefdom",["Bangambaya CHP","Dunamor CHP","Fabandu MCHP","Fanema MCHP","Fensedu MCHP","Gbambiadu MCHP","Gbeya MCHP","Kayima CHC","Kochero MCHP","Koima (Sandor) MCHP","Kondeya (Sandor) MCHP","Mansundu (Sandor) MCHP","Samandu MCHP","Seidu Sandor MCHP","Taiya MCHP","Tefeya CHC","Tefeya CHP","Wordu CHP","Yardu CHC","Yardu MCHP","Yengema Sandor CHP","Yormandu CHC"]],["Soa Chiefdom",["Bandasuma (Soa) MCHP","Feuror MCHP","Foindu Mongor CHP","Gbamandu MCHP","Kainkordu CHC","Kainkordu CHP","Kamindu MCHP","Manjama CHC","Manjama MCHP","Semendu MCHP","Sukudu (Soa) MCHP"]],["Tankoro Chiefdom",["Adama Marth Memorial CHC","Baiama CHC","Kensay CHP","Kimbadu CHC","Kissi Bona CHP","Koakoyima CHC","Koyadu CHC","Tongoro MCHP","White House Clinic","Woama CHP"]],["Toli Chiefdom",["Kondewakoro MCHP","Kpetema (Toli) MCHP"]]]],["MOY","Moyamba",[["Bagruwa Chiefdom",["Benkeh MCHP","Kawaya CHP","Mokassie CHP","Mosenegor MCHP","Ngiebu CHC","Sembehun (Bagruwa) CHC","Sembehunwo MCHP"]],["Bumpeh Chiefdom",["Belletin CHP","Bumpeh River CHP","Mende Town MCHP","Moforay MCHP","Mokaiyegbeh MCHP","Mosella CHP","Motorbong MCHP","Moyeamoh CHP","Rotifunk CHC","Sahun (Bumpeh) MCHP","Samu CHP","Seweima MCHP","UMC Rotifunk Hospital","Yenkessa MCHP"]],["Dasse Chiefdom",["Bambuibu Tommy MCHP","Hope Rising CHP","Kabaima MCHP","Kenema Gbandoma MCHP","Laugh Out Loud Clinic","Laught Out Loud Clinic","Mano (Dasse) CHC","Mogbaske CHP","Taninihun Kapuima MCHP"]],["Fakunya Chiefdom",["Falaba MCHP","Gandorhun (Fakunya) CHC","Mokalley MCHP","Mokorewa MCHP","Moyamba Junction CHC","Moyollo MCHP","Njagbahun (Fakunya) MCHP","Rotawa CHP"]],["Kaiyamba Chiefdom",["Gbonjeima MCHP","Kangahun CHC","Komende (Kaiyamba) MCHP","Korgbotuma MCHP","Levuma (Kaiyamba) MCHP","Moyamba Government Hospital","Moyamba Static 1 CHP","Moyamba Static 2 CHC","Salina CHP","Yoyema MCHP"]],["Kamajei Chiefdom",["Gondama (Kamajei) CHP","Joyah MCHP","Mogbuama MCHP","Senehun (Kamajei) CHC"]],["Kargboro Chiefdom",["Bumpetoke (Kargboro) CHP","Mokaisumana CHP","Mokandoh CHP","Mokobo MCHP","Mokonbetty MCHP","Mopailleh MCHP","Ngeihun (Kargboro) MCHP","Plaintain Island MCHP","Shenge CHC","Yorgbofore CHC","Yorgbofore MCHP","Youndu CHP"]],["Kongbora Chiefdom",["Bauya (Kongbora) CHC","Lawana (Kongbora) MCHP","Levuma Nyomeh CHP","Magbenka CHP","Taninihun Mboka MCHP"]],["Kori Chiefdom",["Bai Largo MCHP","Fogbo (Kori) CHP","Gbuihun MCHP","Judy Smith CHP","Juma MCHP","Konda CHP","Manjeihun MCHP","Mosongo MCHP","Njala (Kori) CHC","Njala University Hospital","Taiama (Kori) CHC","United Methodist Church Taiama CHP","Waiima (Kori) MCHP"]],["Kowa Chiefdom",["Bendu (Kowa) MCHP","Mofombo MCHP","Njama (Kowa) CHC","Tabe MCHP"]],["Lower Banta Chiefdom",["Gbangbatoke CHC","Kanga (Lower Banta) MCHP","Mokanji CHC","Mokotawa CHP","Moriba Town (Lower Banta) CHC","Moriba Town (Lower Banta) CHP","Mosenesie Junction CHP","Njagbahun (Lower Banta) MCHP","St Mary's Clinic"]],["Ribbi Chiefdom",["Bradford CHC","Ferry CHP","Mabang (Ribbi) MCHP","Mogbongisseh MCHP","Mokorbu MCHP","Motoni CHC","Motoni MCHP","Motonkoh MCHP","Rokolor MCHP","Suen CHP"]],["Timdale Chiefdom",["Bomotoke CHC","Mokaiyamba MCHP","Mokpanabom MCHP","Mosagbeh MCHP","Mosanda CHP"]],["Upper Banta Chiefdom",["Children of the Nation Ngolala CHP","Gondama (Upper Banta) MCHP","Modonkor CHP","Mogomgbe MCHP","Mokelleh CHC"]]]],["POR","Port Loko",[["Port Loko City",["Arab (Port Loko) Clinic","Ernest Bai Koroma University (EBK-PL) Clinic","Port Loko Government Hospital","Port Loko Under Fives CHP"]],["Bake-Loko Chiefdom",["Arab (Bake-Loko) Clinic","Ernest Bai Koroma University (EBK-PL) Clinic","Gbonkoh Kereneh MCHP","Kamaranka Under Fives CHP","Malal CHP","Sierra Leone Church Maforki CHP"]],["Bureh Chiefdom",["Bureh MCHP","Kalangba (Bureh) MCHP","Mange CHC","Masseseh MCHP"]],["Kaffu Bullom Chiefdom",["Al-Amin Clinic","Alimamy Amara Clinic","Arab (Lungi) Clinic","Bai Bureh Memorial Hospital","Conakry Dee CHC","Direct Aid Orphanage (Port Loko) Clinic","Evans CHC","Gbaneh Bana CHP","Gbaneh Lol MCHP","Grace Community Clinic","Kasongha CHP","Long Life Centre Clinic","Lungi Airport Centre Clinic","Lungi Government Hospital","Lungi Under Fives CHP","Mahera CHC","Mamankie MCHP","Mkamsondo MCHP","Modia CHC","Modia General Clinic","St John of God CHP","Tagrin CHC","Yongoro CHC"]],["Kamasondo Chiefdom",["Benkia MCHP","Bundulai MCHP","Katongha MCHP","Konta Wallah CHC","Malap CHP","Mana 2 CHP","Mapillah MCHP","Pepel CHC"]],["Kasseh Chiefdom",["Barmoi CHP","Kagbantama CHP","Kawengha MCHP","Rogballan (Kasseh) MCHP","Romeni MCHP"]],["Koya (Port Loko) Chiefdom",["Kissy Koya MCHP","Komrabai Ngolla CHP","Kurankoh CHP","M'baimba Adama MCHP","Mabora MCHP","Magbeni MCHP","Makalie MCHP","Makarankay CHP","Makiteh (Koya) CHP","Malenki MCHP","Masiaka (Koya) CHC","Masumana CHP","Mawoma MCHP","Mile 38 CHC","Rofoindu CHP","Rokon MCHP","Sumbuya (Koya) CHP","Warima (Koya) MCHP"]],["Lokomasama Chiefdom",["Babara CHC","Bailor CHP","Gbainty Wallah CHP","Kalangba (Lokomasama) MCHP","Kargbulor CHP","Love Bridge Hospital","Masulamani CHP","Mathen MCHP","Menika CHP","Musaia (Lokomasama) CHP","Petifu Junction CHC"]],["Maconteh Chiefdom",["Mabain MCHP","Minthomore CHP"]],["Maforki Chiefdom",["Mabonie CHP","Mafoimara CHP","Maforay (Maforki) MCHP","Magbengbenra MCHP","Makaba MCHP","Mapawn MCHP","Maronko MCHP","New Maforki CHP","Petifu (Maforki) MCHP","Rogbere Junction CHC"]],["Makama Chiefdom",["Kambia Makama CHP","Malekuray CHC"]],["Marampa Chiefdom",["Arab (Lunsar) Clinic","Baptist Eye Hospital","Lunsar CHC","Magbele MCHP","Magbill CHP","Makabo MCHP","Mamusa MCHP","Mange Acre CHC","Pincer's Lunsar Clinic","Poor Man's Clinic","Rolembray MCHP","St John of God Hospital","St John of God Under Fives Clinic"]],["Masimera Chiefdom",["Katick CHP","Konta Line CHC","Mamaligie MCHP","Masimera CHC","Mathineh CHP","Mayola Lal Ratun MCHP","Mayombo MCHP","Nonkoba CHP","Rokassa CHC","Rokel (Masimera) MCHP","Rotheren MCHP","Rothuma MCHP","Royeiben CHP"]],["Tainkatopa Chiefdom",["Asheea MCHP","Robaka MCHP","Rogbaneh MCHP"]]]],["PUJ","Pujehun",[["Barri Chiefdom",["Bandasuma (Barri) CHC","Jeoma Barri MCHP","Konia (Barri) MCHP","Kundorwahun CHP","Njaluahun (Barri) CHP","Potoru CHC","Saahun (Barri) MCHP","Tambeiyama MCHP","Taninahun (Barri) MCHP","Vaama (Barri) CHP","Waiima (Barri) MCHP"]],["Galliness Chiefdom",["Bandama (Galliness) MCHP","Blama Massaquoi CHC","Fonikoh MCHP","Funyehun CHP","Kpetema (Galliness) MCHP","Kpowubu MCHP","Makorma CHP"]],["Kabonde Chiefdom",["Pehala CHC"]],["Kpaka Chiefdom",["Liya MCHP","Massam CHC","Saahun (Kpaka) MCHP","Semabu (Kpaka) MCHP","Sumbuya Bessima CHP"]],["Kpanga Chiefdom",["Basalleh MCHP","Blama Puilla MCHP","Bomu Samba MCHP","Dandabu CHP","Gbondapi CHC","Gibina MCHP","Mandeima MCHP","Pujehun Government Hospital","Pujehun Static CHC","Salima Samba MCHP","Sawula MCHP","Sorbeh Grima MCHP","Taninahun Makemuma MCHP","Tongay MCHP","Vawahun Kayimba MCHP"]],["Kpanga Krim Chiefdom",["Bayama MCHP","Borborbu MCHP","Gobaru CHC","Vaama (Kpanga Krim) MCHP"]],["Makpele Chiefdom",["Dumagbe MCHP","Gbaa (Makpele) CHP","Gbahama (Makpele) MCHP","Gissiwolo MCHP","Gofor CHP","Ndombu MCHP","Pewa MCHP","Zimmi CHC"]],["Malen Chiefdom",["Bendu (Malen) MCHP","Hongai CHP","Jao (Malen) MCHP","Ngandorhun MCHP","Nianyahun MCHP","Nyandehun (Malen) MCHP","Sahn (Malen) CHC","Sengema (Malen) CHP","Taninahun (Malen) CHP"]],["Mano Sakrim Chiefdom",["Bengani MCHP","Gombu MCHP","Kassay MCHP","Mano Gbongema CHC","Mende MSK MCHP","Nyandehun (Mano Sakrim) MCHP","Senbengu MCHP"]],["Peje Chiefdom",["Bongay MCHP","Bumbeh MCHP","Futa Pejeh CHC","Helebu Pejeh MCHP","Pejewa (Futa Peje) MCHP"]],["Perri Chiefdom",["Blama Perri MCHP","Bomi MCHP","Bumpeh (Perri) CHC","Falaba CHP","Kowama (Perri) MCHP","Ngajubaoma/Missibu MCHP","Saama Perri MCHP"]],["Soro Gbeima Chiefdom",["Fairo CHC","Fanima (Soro) CHP","Futa Golawoma MCHP","Gondama Massaquoi MCHP","Jendema CHC","Koijeh MCHP","Malema 1 MCHP","Malema 2 MCHP","Navai MCHP","Sengama Soro MCHP","Sulima CHP","Tindor MCHP","Wai MCHP"]],["Sowa Chiefdom",["Bandajuma Sowa CHC","Geoma Jarjoh CHP","Lower Komende MCHP","Upper Komende MCHP","Vaawahun Sowa MCHP"]],["Yakemoh Kpukumu Krim Chiefdom",["Bangorma MCHP","Borma (Yakemu Kpukumu) MCHP","Karlu CHC","Kombeima MCHP","Kombopi MCHP","Messima MCHP","Saama Sowunde MCHP"]]]],["TON","Tonkolili",[["Dansogoia Chiefdom",["Bassaia MCHP","Bumbuna CHC","Kemedugu MCHP","New Ferengbeya CHP"]],["Gbokolenken Masankong Chiefdom",["Mansumana CHP","Warrima (Gbonkolenken) MCHP"]],["Gbokolenken Mayeppoh Chiefdom",["Makonkorie CHP","Mayepoh CHC","Mayepoh CHP","Petifu Mayepoh MCHP"]],["Gbokolenken Polie Chiefdom",["Mabankra MCHP","Mabarr Polie MCHP","Magbolu Ferry MCHP","Maraka MCHP","Mathamp MCHP"]],["Gbokolenken Yele Chiefdom",["Lion Heart Hospital","Mafay MCHP","Manowo CHC","Yeben MCHP","Yele CHC"]],["Kafe Chiefdom",["Kamarugu MCHP","Masumbrie CHC"]],["Kalantuba Chiefdom",["Kamasaypana MCHP","Kathombo MCHP"]],["Kholifa Mabang Chiefdom",["Komrabai Station MCHP","Mabai (Kholifa Mabang) MCHP","Mabang (Kholifa Mabang) CHC","Mamanso Kafla MCHP","Marunia MCHP","Mathinkalol MCHP"]],["Kholifa Mamuntha Chiefdom",["Maborie MCHP","Magbass CHP","Mamuntha MCHP","Masagbill MCHP","Masoko MCHP","Mayossoh MCHP"]],["Kholifa Rowalla Chiefdom",["Alim MCHP","Family (Magburaka) Clinic","Mabai (Kholifa Rowalla) MCHP","Mabom CHC","Magburaka Government Hospital","Magburaka Under Fives Clinic","Malone MCHP","Masanga Hospital","Masanga MCHP"]],["Kunike Barina Chiefdom",["Makali CHC","Makoni Line MCHP","Mapamurie MCHP","Massaba MCHP","Wonkibor MCHP"]],["Kunike Fulawusu Chiefdom",["Fothaneh Bana MCHP","Mafulka MCHP","Magbanabom MCHP","Magbanto Bana MCHP","Mamanso Sanka CHP","Petifu Mandugu MCHP"]],["Kunike Sanda Chiefdom",["Fothaneh Junction MCHP","Kamanthor MCHP","Mabineh MCHP","Maconteh Tama MCHP","Masiaka (Kunike Sanda) MCHP","Masingbi CHC","Matholey MCHP","Petifuline CHP"]],["Malal Chiefdom",["Makoba Bana MCHP","Robina CHP","Rochen Malal CHP"]],["Sambaya Bendugu Chiefdom",["Bendugu CHC","Dankawalia CHP","Kholifaga MCHP","Kunya CHP","Ninkikoro MCHP"]],["Simiria Chiefdom",["Mabontor CHC","Mabontor CHP","Makonthanday MCHP","Masumbrie CHC","Mayassoh MCHP"]],["Tane Chiefdom",["Makelleh MCHP","Makona MCHP","Makrugbeh CHP","Mananthelie MCHP","Mangaybana MCHP","Masankoro MCHP","Mathonkara MCHP","Mathufulie MCHP","Matotoka CHC","Rosengbeh MCHP"]],["Yoni Mabanta Chiefdom",["Bakeloko CHP","Bath Bana MCHP","Magbaesa MCHP","Magbaft MCHP","Magbassabana MCHP","Magbosie MCHP","Makeni-Rokfullah MCHP","Makundu MCHP","Matawa MCHP","Petifu Fulamasa CHP","Robarie MCHP","Ronietta MCHP","Rorocks CHC"]],["Yoni Mamala Chiefdom",["Ahmadiyya Muslim (Yoni Mamala) Hospital","Bonkababay CHP","Community Health Foundation (Mile 91) Hospital","Foindu (Yoni Mamala) MCHP","Hinistas CHC","Kumrabai Yoni CHP","Macrogba CHP","Magboki Road Mile 91 CHP","Magbosie MCHP","Makelleh CHP","Mamaka (Yoni Mamala) MCHP","Mananie MCHP","Masengbeh CHP","Maseperr MCHP","Mathoir CHC","Mayorgbor MCHP","Our Lady of Guadalupe Clinic","Rochen Kamandao CHP","Rokimbi MCHP","United Methodist Church Yonibana CHC","Yonibana MCHP","Yonibana Sai Hospital"]]]],["WAR","Western Area Rural",[["Koya Rural Zone",["Christ the King Clinic","Crossing MCHP","Don Bosco Fambul Clinic","Fogbo (Koya Rural) MCHP","Madaka MCHP","Makobeh MCHP","Makonkonday MCHP","Malambay CHP","Masorie CHP","MedZain MCHP","Monsignor Daniel Sullivan Health Clinic","Newton CHC","Songo CHC"]],["Mountain Rural Zone",["Charlotte CHP","Fourah Bay College CHC","Gloucester CHP","Leicester (Mountain Rural) CHP","Regent (Mountain Rural) CHC"]],["Waterloo Rural Zone",["ADRA Mobile Clinic","Adra Hospital","African Christian Fellowship (ACF) Clinic","Afro Arab Clinic","Arab (Waterloo) Clinic","Benguema Grassfield MCHP","Benguema Military (MI Room) Clinic","Biola Wright Memorial Clinic","Borah Maternity Clinic","Brown Memorial Clinic","Campbell Town CHP","Cashew Farm MCHP","Christ the King Clinic","Deep Eye Water MCHP","El-Shaddai (Waterloo Rural) Clinic","Evangelical College of Theology Clinic","Freetown Teachers College Clinic","Gift of Life Clinic","Grafton CHC","Hastings CHC","Heart and Hands Care Clinic","Jays Clinic","John Thorpe MCHP","Jui Police (MI Room) Clinic","Kissy Town CHP","Lumpa CHP","Mabureh CHP","MacDonald MCHP","Maila Clinic","Mapac Grafton Clinic","Margaret and Johnny MCHP","Mariama Hassan Hospital","Matainkay and Masantigie MCHP","MedZain MCHP","Monsignor Daniel Sullivan Health Clinic","New London MCHP","Rogbangba MCHP","Rokel (Waterloo Rural) CHP","Rokel Arab (Waterloo) Clinic","SWAKAB (Waterloo) Clinic","Salifu Kondeh Clinic","Sierra Leone-China Teaching Hospital","TECT Jui CHP","Waterloo CHC","Waterloo People's Clinic","Waterloo Rural Community Hospital","White Stone MCHP","Women in National Development AAPDEP Clinic","Yams Farm CHP"]],["York Rural Zone",["Adonkia CHP","Banana Island MCHP","Bethlehem Clinic","Emergency (Goderich) Hospital","Friends of God Clinic","Goderich CHC","Goderich Military (MI Room) Clinic","Hamilton MCHP","Kent CHP","Lakka Government Hospital","Lakka/Ogoo Farm CHC","Lion for Lion Clinic","Mambo CHP","Metchen MCHP","Milton Margai College (MMCET) Clinic","Mutual Faith Clinic","Sussex MCHP","Tissana (York Rural) MCHP","Tokeh MCHP","Tombo (York Rural) CHC","York CHC"]]]]];
+
+/* Registrar IDs keep their original shape — HHR + a number — and are handed
+   out by walking the tree once (district, chiefdom, PHU, registrar), so every
+   ID in the country is unique and belongs to exactly one PHU. The PHU's own
+   location code (BO-03-007) is shown while drilling down, but it never enters
+   an HHR ID, a token or a record key. */
+const pad=(n,w)=>String(n).padStart(w,'0');
+const HHR_PAD=4;                        /* HHR0001 … HHR3130 */
+function hhrId(seq){ return 'HHR'+pad(seq,HHR_PAD); }
+const HHRS=[], HHR_BY_ID={}, HHR_AT={};
+(function buildRegistrars(){
+  let seq=0;
+  HIER.forEach((d,di)=>d[2].forEach((c,ci)=>c[1].forEach((phu,pi)=>{
+    for(let hi=0;hi<HHR_PER_PHU;hi++){
+      const rec={id:hhrId(++seq), seq:seq, di:di, ci:ci, pi:pi, hi:hi, n:hi+1,
+                 district:d[1], districtCode:d[0], chiefdom:c[0], phu:phu,
+                 phuCode:d[0]+'-'+pad(ci+1,2)+'-'+pad(pi+1,3)};
+      HHRS.push(rec); HHR_BY_ID[rec.id]=rec; HHR_AT[di+':'+ci+':'+pi+':'+hi]=rec;
+    }
+  })));
+})();
+/* from an ID back to the PHU it belongs to, or null if it is not a real ID */
+function hhrPlace(id){ return HHR_BY_ID[String(id||'').toUpperCase()]||null; }
+function hhrAt(di,ci,pi,hi){ return HHR_AT[di+':'+ci+':'+pi+':'+hi]||null; }
+function hhrCount(){ return HHRS.length; }
+/* Every registrar is admin / admin for now — one place to change when the
+   real per-HHR credentials are issued. */
+function credsFor(code){ return hhrPlace(code) ? {u:'admin', p:'admin'} : null; }
+function phuCount(){ return HIER.reduce((s,d)=>s+d[2].reduce((t,c)=>t+c[1].length,0),0); }
 
 /* ---------- storage ---------- */
 const Store=(()=>{let ok=false,mem={};try{localStorage.setItem('__t','1');localStorage.removeItem('__t');ok=true;}catch(e){}
@@ -397,33 +428,98 @@ const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&g
 function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('show'),2200);}
 
 /* =========================================================
-   SCREEN 1 — the HHR list
+   SCREEN 1 — district > chiefdom > PHU > registrar
    ========================================================= */
-let pickId=null;   /* HHR tapped, awaiting login */
-function renderHHRs(){
-  let tiles='';
-  for(let i=1;i<=HHR_COUNT;i++){
-    const id=hhrId(i);
-    const rec=Store.get(recKey(id),{});
-    const n=Object.keys(rec).reduce((s,d)=>s+Object.keys(rec[d]||{}).length,0);
-    const all=DAYS*PER_DAY;
-    const cls=n>=all?'done':(n>0?'todo':'');
-    tiles+=`<button class="tile ${cls}" onclick="openLogin('${id}')">
-      <div class="tn">${id}</div>
-      <div class="tk">${n} / ${all} households</div>
-      <div class="ttrack"><div class="tfill ${n>=all?'full':''}" style="width:${Math.round(n/all*100)}%"></div></div>
+let pickId=null;   /* HHR code tapped, awaiting login */
+let navD=0, navC=0;
+
+/* how many households a registrar has already saved, from their own store */
+function codeDone(code){
+  const rec=Store.get(recKey(code),{});
+  return Object.keys(rec).reduce((s,d)=>s+Object.keys(rec[d]||{}).length,0);
+}
+function crumb(parts){
+  return `<div class="crumb">${parts.map(esc).join('<span class="cs">\u203a</span>')}</div>`;
+}
+function bar(eyebrow,title,back){
+  return `<div class="appbar">
+    <button class="ico-btn" onclick="${back}">${back.indexOf('renderDistricts')>-1?I.home:I.back}</button>
+    <div class="titles"><div class="eyebrow">${esc(eyebrow)}</div><div class="title">${esc(title)}</div></div>
+  </div>`;
+}
+
+function renderDistricts(){
+  const tiles=HIER.map((d,i)=>{
+    const ch=d[2].length, ph=d[2].reduce((s,c)=>s+c[1].length,0);
+    return `<button class="tile" onclick="renderChiefdoms(${i})">
+      <div class="top"><span class="tn">${esc(d[1])}</span><span class="tb code">${esc(d[0])}</span></div>
+      <div class="tk">${ch} chiefdoms \u00b7 ${ph} PHUs</div>
     </button>`;
-  }
+  }).join('');
   app.innerHTML=`<div class="body">
     <div class="hero">
       <h1>ITN Household Registration</h1>
-      <p>Select your registrar ID and sign in. Each registrar covers 25 households a day over 10 days.</p>
+      <p>Find your PHU to sign in. 15 districts, ${phuCount()} PHUs, ${hhrCount()} registrars.</p>
     </div>
     <div class="list">
-      <h2>Registrars</h2>
-      <div class="sub">${HHR_COUNT} accounts · HHR01 to HHR${HHR_COUNT}</div>
-      <div class="grid g3">${tiles}</div>
+      <h2>District</h2>
+      <div class="sub">Western Area Urban is not part of this campaign.</div>
+      <div class="grid g2">${tiles}</div>
       <div class="ver">Version ${esc(APP_VERSION)}</div>
+    </div></div>`;
+}
+
+function renderChiefdoms(di){
+  navD=di;
+  const d=HIER[di];
+  const tiles=d[2].map((c,i)=>`<button class="tile" onclick="renderPhus(${di},${i})">
+      <div class="top"><span class="tn">${esc(c[0])}</span><span class="tb code">${esc(d[0]+'-'+pad(i+1,2))}</span></div>
+      <div class="tk">${c[1].length} PHU${c[1].length===1?'':'s'} \u00b7 ${c[1].length*HHR_PER_PHU} registrars</div>
+    </button>`).join('');
+  app.innerHTML=bar(d[1]+' district','Chiefdom','renderDistricts()')+
+    `<div class="body"><div class="list">
+      ${crumb([d[1]])}
+      <h2>Chiefdom</h2>
+      <div class="sub">${d[2].length} chiefdoms in ${esc(d[1])}.</div>
+      <div class="grid g1">${tiles}</div>
+    </div></div>`;
+}
+
+function renderPhus(di,ci){
+  navD=di; navC=ci;
+  const d=HIER[di], c=d[2][ci];
+  const tiles=c[1].map((p,i)=>`<button class="tile" onclick="renderHHRs(${di},${ci},${i})">
+      <div class="top"><span class="tn small">${esc(p)}</span><span class="tb code">${esc(d[0]+'-'+pad(ci+1,2)+'-'+pad(i+1,3))}</span></div>
+      <div class="tk">${HHR_PER_PHU} registrars</div>
+    </button>`).join('');
+  app.innerHTML=bar(d[1]+' \u203a '+c[0],'PHU','renderChiefdoms('+di+')')+
+    `<div class="body"><div class="list">
+      ${crumb([d[1],c[0]])}
+      <h2>PHU</h2>
+      <div class="sub">${c[1].length} PHU${c[1].length===1?'':'s'} in ${esc(c[0])}.</div>
+      <div class="grid g1">${tiles}</div>
+    </div></div>`;
+}
+
+function renderHHRs(di,ci,pi){
+  const d=HIER[di], c=d[2][ci], phu=c[1][pi];
+  let tiles='';
+  for(let h=0;h<HHR_PER_PHU;h++){
+    const r=hhrAt(di,ci,pi,h); if(!r) continue;
+    const n=codeDone(r.id), all=DAYS*PER_DAY;
+    const cls=n>=all?'done':(n>0?'todo':'');
+    tiles+=`<button class="tile ${cls}" onclick="openLogin('${r.id}')">
+      <div class="top"><span class="tn">${esc(r.id)}</span><span class="tb code">${esc(r.phuCode)}</span></div>
+      <div class="tk">Registrar ${r.n} of ${HHR_PER_PHU} \u00b7 ${n} of ${all} households</div>
+      <div class="ttrack"><div class="tfill ${n>=all?'full':''}" style="width:${Math.round(n/all*100)}%"></div></div>
+    </button>`;
+  }
+  app.innerHTML=bar(c[0]+' \u203a '+phu,'Registrar','renderPhus('+di+','+ci+')')+
+    `<div class="body"><div class="list">
+      ${crumb([d[1],c[0],phu])}
+      <h2>Registrar</h2>
+      <div class="sub">${HHR_PER_PHU} registrars at ${esc(phu)} \u00b7 ${esc(d[0]+'-'+pad(ci+1,2)+'-'+pad(pi+1,3))}. Tap your HHR ID to sign in.</div>
+      <div class="grid g1">${tiles}</div>
     </div></div>`;
 }
 
@@ -431,24 +527,27 @@ function renderHHRs(){
    LOGIN
    ========================================================= */
 function openLogin(id){ pickId=id; renderLogin(''); }
+function backFromLogin(){
+  const pl=hhrPlace(pickId);
+  pl ? renderHHRs(pl.di,pl.ci,pl.pi) : renderDistricts();
+}
 function renderLogin(err){
   app.innerHTML=`<div class="appbar">
-      <button class="ico-btn" onclick="renderHHRs()">${I.back}</button>
+      <button class="ico-btn" onclick="backFromLogin()">${I.back}</button>
       <div class="titles"><div class="eyebrow">Sign in</div><div class="title">${esc(pickId)}</div></div>
     </div>
     <div class="body"><div class="list">
       <h2>Sign in as ${esc(pickId)}</h2>
-      <div class="sub">Use the username and password issued to this registrar.</div>
+      ${(()=>{const pl=hhrPlace(pickId);return pl?`<div class="sub">${esc(pl.phu)} \u00b7 ${esc(pl.chiefdom)} \u00b7 ${esc(pl.district)} district \u00b7 registrar ${pl.n} of ${HHR_PER_PHU}</div>`:'<div class="sub">Use the username and password issued to this registrar.</div>';})()}
       ${err?`<div class="flag bad">${esc(err)}</div>`:''}
       <div class="card">
         <div class="field"><div class="lbl">Username</div>
           <input type="text" id="lu" autocapitalize="none" autocomplete="off" spellcheck="false" placeholder="Username"></div>
-        <div class="field" style="margin-bottom:0"><div class="lbl">Password</div>
+        <div class="field"><div class="lbl">Password</div>
           <input type="password" id="lp" autocomplete="off" placeholder="Password"></div>
+        <button class="btn btn-primary btn-block" onclick="doLogin()">Sign in</button>
       </div>
-      <div class="note">Every account is <b>admin</b> / <b>admin</b> until the real credentials are issued.</div>
-    </div></div>
-    <div class="footer"><button class="btn btn-primary btn-block" onclick="doLogin()">Sign in</button></div>`;
+    </div></div>`;
   const p=document.getElementById('lp');
   p.addEventListener('keydown',e=>{ if(e.key==='Enter') doLogin(); });
   document.getElementById('lu').focus();
@@ -456,17 +555,22 @@ function renderLogin(err){
 function doLogin(){
   const u=document.getElementById('lu').value.trim();
   const p=document.getElementById('lp').value;
-  const c=CREDS[pickId];
+  const c=credsFor(pickId);
   if(!c||u.toLowerCase()!==c.u||p!==c.p){ renderLogin('Username or password is wrong. Try again.'); return; }
   me=pickId; Store.set(SESS_KEY,me); loadDone(); renderMenu();
 }
 function logout(){
   if(!confirm('Sign out of '+me+'? Registered households stay on this device.')) return;
-  me=null; Store.del(SESS_KEY); done={}; recs={}; renderHHRs();
+  me=null; Store.del(SESS_KEY); done={}; recs={}; renderDistricts();
 }
 
+/* where the signed-in registrar is posted, for the screens that show it */
+function mePlaceLine(){
+  const pl=hhrPlace(me);
+  return pl ? me+' \u00b7 '+pl.phu+', '+pl.chiefdom+', '+pl.district : String(me||'');
+}
 /* =========================================================
-   MENU — the two things this app does
+   MENU — what this app does
    ========================================================= */
 function renderMenu(){
   const t=totalDone(), all=DAYS*PER_DAY, cur=currentDay();
@@ -474,7 +578,7 @@ function renderMenu(){
   app.innerHTML=`<div class="body">
     <div class="hero">
       <h1>ITN Household Registration</h1>
-      <p>Signed in as ${esc(me)} \u00b7 25 households a day, 10 days.</p>
+      <p>${esc(mePlaceLine())}<br>${PER_DAY} households a day, ${DAYS} days.</p>
     </div>
     <div class="list">
       ${outBar()}
@@ -947,7 +1051,8 @@ const FORM=[
      help:'1 to 2 people = 1 ITN, 3 to 4 = 2 ITNs, 5 or more = 3 ITNs.',
      from:a=>itnsFor(a.size)},
   {id:'u5',    n:6, q:'How many under-fives are in the household?', type:'int', unit:'under-fives', min:0, max:30},
-  {id:'token', n:7, q:'Household token', type:'calc',
+  {id:'preg',  n:7, q:'How many pregnant women are in the household?', type:'int', unit:'pregnant women', min:0, max:20},
+  {id:'token', n:8, q:'Household token', type:'calc',
      help:'Generated from your HHR ID, the household number and the head\u2019s initials.',
      from:a=>a._token||''}
 ];
@@ -980,6 +1085,9 @@ function fieldErr(q,a){
   }
   if(q.id==='u5'&&a.size!==undefined&&String(a.size).trim()!==''){
     if(Number(v)>Number(a.size)) return 'More under-fives than people in the household.';
+  }
+  if(q.id==='preg'&&a.size!==undefined&&String(a.size).trim()!==''){
+    if(Number(v)>Number(a.size)) return 'More pregnant women than people in the household.';
   }
   return '';
 }
@@ -1115,7 +1223,7 @@ function saveEdit(){
   const was=!!old._submitted;
   modal(`<h3>Changes saved</h3>
     <div class="tok-show">${esc(rec.token)}</div>
-    <p style="margin-top:12px">${esc(rec.first+' '+rec.last)} \u00b7 ${rec.size} people \u00b7 ${rec.itns} ITN${rec.itns===1?'':'s'} \u00b7 ${rec.u5} under-five${Number(rec.u5)===1?'':'s'}<br>Revision ${rec._rev} \u00b7 same record, same token.</p>
+    <p style="margin-top:12px">${esc(rec.first+' '+rec.last)} \u00b7 ${rec.size} people \u00b7 ${rec.itns} ITN${rec.itns===1?'':'s'} \u00b7 ${rec.u5} under-five${Number(rec.u5)===1?'':'s'} \u00b7 ${rec.preg} pregnant<br>Revision ${rec._rev} \u00b7 same record, same token.</p>
     ${was?`<div class="sync-bar warn" style="margin:0"><span class="d"></span>
         <div class="t">This record was already submitted. Resubmit it so NMDR gets the corrected values.</div></div>`
         :`<div class="gps-ok">It will go up with the rest of Day ${d}.</div>`}
@@ -1173,6 +1281,8 @@ function finish(gps){
   const rec=Object.assign({},form,{
     _id:me+'-D'+d+'-H'+h,          /* stable — a resubmission updates this row */
     _hhr:me, _day:d, _hh:h, _serial:hhSerial(d,h),
+    _district:(hhrPlace(me)||{}).district||'', _chiefdom:(hhrPlace(me)||{}).chiefdom||'',
+    _phu:(hhrPlace(me)||{}).phu||'', _phuCode:(hhrPlace(me)||{}).phuCode||'',
     token:form._token, itns:itnsFor(form.size),
     gpsLat:gps.lat, gpsLng:gps.lng, gpsAcc:gps.acc, gpsAt:gps.at,
     _rev:1, _submitted:false, _dirty:false, _submittedAt:'',
@@ -1187,7 +1297,7 @@ function finish(gps){
   const full=dayComplete(d);
   modal(`<h3>Household ${h} registered</h3>
     <div class="tok-show">${esc(rec.token)}</div>
-    <p style="margin-top:12px">${esc(rec.first+' '+rec.last)} \u00b7 ${rec.size} people \u00b7 ${rec.itns} ITN${rec.itns===1?'':'s'} \u00b7 ${rec.u5} under-five${Number(rec.u5)===1?'':'s'}</p>
+    <p style="margin-top:12px">${esc(rec.first+' '+rec.last)} \u00b7 ${rec.size} people \u00b7 ${rec.itns} ITN${rec.itns===1?'':'s'} \u00b7 ${rec.u5} under-five${Number(rec.u5)===1?'':'s'} \u00b7 ${rec.preg} pregnant</p>
     <div class="gps-ok">GPS recorded \u00b7 ${gps.lat}, ${gps.lng} (\u00b1${gps.acc} m)</div>
     ${full?`<div class="sync-bar warn" style="margin:13px 0 0"><span class="d"></span>
         <div class="t"><b>Day ${d} is finished.</b><br>Submit its ${PER_DAY} records now.</div></div>`:''}
@@ -1227,6 +1337,7 @@ function renderSaved(){
         ${row('People in household',r.size)}
         ${row('ITNs to be given',r.itns)}
         ${row('Under-fives',r.u5)}
+        ${row('Pregnant women',r.preg)}
         ${row('Token',r.token)}
         ${row('GPS',r.gpsLat?r.gpsLat+', '+r.gpsLng+' (\u00b1'+r.gpsAcc+' m)':'not recorded')}
         ${row('Revision',r._rev||1)}
@@ -1270,7 +1381,7 @@ function submitOne(d,h){
 }
 
 /* ---------- start ---------- */
-if(me&&CREDS[me]){ loadDone(); renderMenu(); } else { me=null; renderHHRs(); }
+if(me&&credsFor(me)){ loadDone(); renderMenu(); } else { me=null; renderDistricts(); }
 </script>
 </body>
 </html>
