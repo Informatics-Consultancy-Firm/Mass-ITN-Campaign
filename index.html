@@ -284,7 +284,7 @@
    ITN Household Registration — HHR app
    HHR01 … HHR100 · 10 days · 25 households per day
    ========================================================= */
-const APP_VERSION='2026.07.30i';
+const APP_VERSION='2026.07.30j';
 
 /* =========================================================
    BACKEND — the deployed submission endpoint. It is baked in, so a
@@ -1096,13 +1096,47 @@ function fieldErr(q,a){
    ONE HOUSEHOLD
    ========================================================= */
 let form={}, formD=0, formH=0, showErr=false, editing=false;
+/* The GPS point is taken in the background from the moment the form opens, so
+   by the time the token has been written and submission reaches the GPS step it
+   is almost always already captured. It stays LAST in the flow — nothing is
+   saved before it — but the wait moves off the end of the interview. */
+let gpsFix=null, gpsState='idle', gpsErr='';
+function beginGps(){
+  if(editing) return;
+  if(!navigator.geolocation){ gpsState='fail'; gpsErr='This device has no GPS.'; paintGps(); return; }
+  gpsFix=null; gpsState='getting'; gpsErr=''; paintGps();
+  navigator.geolocation.getCurrentPosition(
+    p=>{ gpsFix={lat:+p.coords.latitude.toFixed(6), lng:+p.coords.longitude.toFixed(6),
+                 acc:Math.round(p.coords.accuracy||0), at:new Date().toISOString()};
+         gpsState='ok'; paintGps(); },
+    e=>{ gpsState='fail';
+         gpsErr=(e&&e.code===1)?'Location permission was refused.':'GPS could not get a fix.';
+         paintGps(); },
+    {enableHighAccuracy:true, timeout:25000, maximumAge:0});
+}
+function gpsCard(){
+  const body =
+    gpsState==='ok'   ? `<div class="gps-ok">Captured \u00b7 ${gpsFix.lat}, ${gpsFix.lng} (\u00b1${gpsFix.acc} m)</div>`
+  : gpsState==='fail' ? `<div class="err">${esc(gpsErr)} It is needed before this household can be registered.</div>
+                         <button class="btn btn-ghost btn-block btn-sm" style="margin-top:9px" onclick="beginGps()">Try again</button>`
+  :                     `<div class="sync-bar wait" style="margin:0"><span class="d"></span>
+                          <div class="t">Taking the GPS point while you work \u2014 it will be ready by the time you submit.</div></div>`;
+  return `<div class="q-card" id="qc_gps">
+    <span class="q-no">GPS</span>
+    <div class="q-txt">Location of the household</div>
+    <div class="q-help">Taken automatically, no typing. Recorded with the household when you submit.</div>
+    ${body}</div>`;
+}
+function paintGps(){ const e=document.getElementById('qc_gps'); if(e) e.outerHTML=gpsCard(); }
 
 function openHH(d,h){
   if(!hhOpen(d,h)){ renderDay(d); return; }
   formD=d; formH=h; showErr=false; editing=false;
   form=Object.assign({},recGet(d,h));
   if(!form.hhrPhone) form.hhrPhone=Store.get('itn_hhr_phone_'+me,'');
-  isDone(d,h) ? renderSaved() : renderForm();
+  if(isDone(d,h)){ gpsFix=null; gpsState='idle'; renderSaved(); return; }
+  renderForm();
+  beginGps();          /* start the fix now, not at the end */
 }
 /* Editing changes the values of an existing record. Its token has already been
    written on paper and given to the household head, so the token is frozen
@@ -1158,6 +1192,7 @@ function renderForm(){
         <div class="meta">Household ${h} on Day ${d} \u2014 number ${hhSerial(d,h)} of your ${DAYS*PER_DAY}.${editing?'<br>Correcting the answers on a record that is already registered.':''}</div></div>
       ${editing?`<div class="note">Change the answers that are wrong and save. This updates the same record \u2014 it does not create a second registration, and the token stays as it was given to the household head.</div>`:''}
       ${visibleQs(form).map(qCard).join('')}
+      ${editing?'':gpsCard()}
     </div></div>
     <div class="footer">${editing
       ? `<button class="btn btn-ghost btn-sm" onclick="editing=false;renderSaved()">Cancel</button>
@@ -1250,20 +1285,23 @@ function tokenStep(again){
       <button class="btn btn-ok" onclick="gpsStep()">Yes, it is written</button>
     </div>`);
 }
-/* Step 2 — take the GPS point, then save. */
+/* Step 2 — the GPS point. Usually already in hand, so this passes straight
+   through; otherwise it waits for the fix that is already being taken. */
 function gpsStep(){
-  modal(`<h3>Taking GPS</h3><div class="spin"></div>
-    <p style="text-align:center">Hold still while the location of the household is recorded.</p>`);
-  if(!navigator.geolocation){ gpsFail('This device has no GPS.'); return; }
-  let settled=false;
-  const t=setTimeout(()=>{ if(!settled){ settled=true; gpsFail('GPS is taking too long.'); } },25000);
-  navigator.geolocation.getCurrentPosition(
-    p=>{ if(settled) return; settled=true; clearTimeout(t);
-      finish({lat:+p.coords.latitude.toFixed(6), lng:+p.coords.longitude.toFixed(6),
-              acc:Math.round(p.coords.accuracy||0), at:new Date().toISOString()}); },
-    e=>{ if(settled) return; settled=true; clearTimeout(t);
-      gpsFail(e&&e.code===1?'Location permission was refused.':'GPS could not get a fix.'); },
-    {enableHighAccuracy:true, timeout:20000, maximumAge:0});
+  if(gpsState==='ok'&&gpsFix){ finish(gpsFix); return; }
+  /* a fix that failed earlier in the interview gets one fresh attempt now —
+     the registrar may well have moved outside since */
+  if(gpsState!=='getting') beginGps();
+  modal(`<h3>Waiting for the GPS point</h3><div class="spin"></div>
+    <p style="text-align:center">Everything else is ready. Hold still \u2014 the household is saved as soon as the point comes in.</p>`);
+  const t0=Date.now();
+  const tick=()=>{
+    if(gpsState==='ok'&&gpsFix){ finish(gpsFix); return; }
+    if(gpsState==='fail'){ gpsFail(gpsErr||'GPS could not get a fix.'); return; }
+    if(Date.now()-t0>30000){ gpsFail('GPS is taking too long.'); return; }
+    setTimeout(tick,250);
+  };
+  setTimeout(tick,150);
 }
 /* A GPS point is required. Without one the household is not registered — the
    only ways out are to try again or to leave the form open and come back. */
@@ -1272,8 +1310,8 @@ function gpsFail(msg){
     <p>${esc(msg)} Step outside or into the open and try again. The household cannot be registered without its GPS point.</p>
     <div class="err">Household ${formH} is not registered.</div>
     <div class="acts">
-      <button class="btn btn-ghost" onclick="closeModal()">Not now</button>
-      <button class="btn btn-primary" onclick="gpsStep()">Try again</button>
+      <button class="btn btn-ghost" onclick="closeModal();paintGps()">Not now</button>
+      <button class="btn btn-primary" onclick="beginGps();gpsStep()">Try again</button>
     </div>`);
 }
 function finish(gps){
@@ -1292,20 +1330,41 @@ function finish(gps){
   if(rec.hhrPhone) Store.set('itn_hhr_phone_'+me,rec.hhrPhone);
   recSet(d,h,rec);
   setDone(d,h,true);
+  gpsFix=null; gpsState='idle';
   closeModal();
-  const nx=nextHH(d);
+  savedModal(rec,'sending');
+  /* each household goes up on its own, as soon as it is registered */
+  if(!GAS_URL||!navigator.onLine){ savedModal(rec,'queued'); return; }
+  sendRec(rec,(ok,status)=>{
+    if(ok){ rec._submitted=true; rec._dirty=false; rec._submittedAt=new Date().toISOString(); }
+    else rec._lastError=status||'failed';
+    saveRecs();
+    savedModal(rec,ok?'sent':'failed');
+  });
+}
+/* The household that was just registered. There is deliberately no shortcut to
+   the next one: the registrar goes back to the day and opens the next card. */
+function savedModal(rec,state){
+  const d=rec._day,h=rec._hh;
   const full=dayComplete(d);
+  const line =
+    state==='sending' ? `<div class="sync-bar wait" style="margin:13px 0 0"><span class="d"></span>
+        <div class="t">Sending this household to NMDR\u2026</div></div>`
+  : state==='sent'    ? `<div class="gps-ok" style="margin-top:13px">In NMDR.</div>`
+  : state==='queued'  ? `<div class="sync-bar warn" style="margin:13px 0 0"><span class="d"></span>
+        <div class="t"><b>Saved on this device.</b><br>${GAS_URL?'No internet \u2014 submit it from the household or with the day.':'NMDR is not connected.'}</div></div>`
+  :                     `<div class="sync-bar warn" style="margin:13px 0 0"><span class="d"></span>
+        <div class="t"><b>Saved, but it did not reach NMDR.</b><br>Open the household and submit it again.</div></div>`;
   modal(`<h3>Household ${h} registered</h3>
     <div class="tok-show">${esc(rec.token)}</div>
     <p style="margin-top:12px">${esc(rec.first+' '+rec.last)} \u00b7 ${rec.size} people \u00b7 ${rec.itns} ITN${rec.itns===1?'':'s'} \u00b7 ${rec.u5} under-five${Number(rec.u5)===1?'':'s'} \u00b7 ${rec.preg} pregnant</p>
-    <div class="gps-ok">GPS recorded \u00b7 ${gps.lat}, ${gps.lng} (\u00b1${gps.acc} m)</div>
+    <div class="gps-ok">GPS \u00b7 ${rec.gpsLat}, ${rec.gpsLng} (\u00b1${rec.gpsAcc} m)</div>
+    ${line}
     ${full?`<div class="sync-bar warn" style="margin:13px 0 0"><span class="d"></span>
-        <div class="t"><b>Day ${d} is finished.</b><br>Submit its ${PER_DAY} records now.</div></div>`:''}
+        <div class="t"><b>Day ${d} is finished.</b>${dayToSend(d).length?' '+dayToSend(d).length+' record'+(dayToSend(d).length===1?'':'s')+' still to submit.':' Everything is in NMDR.'}</div></div>`:''}
     <div class="acts">
-      ${full?`<button class="btn btn-ghost" onclick="closeModal();renderDay(${d})">Later</button>
-              <button class="btn btn-ok" onclick="closeModal();submitDay(${d})">Submit Day ${d}</button>`
-            :`<button class="btn btn-ghost" onclick="closeModal();renderDay(${d})">Day ${d}</button>
-              <button class="btn btn-ok" onclick="closeModal();openHH(${d},${nx})">Household ${nx}</button>`}
+      ${state==='sending'?'':`<button class="btn btn-${full&&dayToSend(d).length?'ghost':'ok'} btn-block" onclick="closeModal();renderDay(${d})">Back to Day ${d}</button>`}
+      ${state!=='sending'&&full&&dayToSend(d).length?`<button class="btn btn-primary" onclick="closeModal();submitDay(${d})">Submit the rest of Day ${d}</button>`:''}
     </div>`);
 }
 
