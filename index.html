@@ -149,6 +149,9 @@
   .legend i.t{background:var(--bad-bg);border-color:var(--bad);}
   .legend i.l{background:#f1f4f7;border-color:#cfd8e0;}
   .legend i.r{background:var(--warn-bg);border-color:var(--warn);}
+  .legend i.mg{background:var(--ok);border-color:var(--ok);}
+  .legend i.my{background:var(--warn);border-color:var(--warn);}
+  .legend i.s{background:var(--white);border-color:var(--ink);border-width:2px;}
 
   .stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-bottom:15px;}
   .stat{background:var(--white);border:1px solid var(--line);border-radius:15px;padding:14px;box-shadow:var(--sh-sm);}
@@ -220,8 +223,12 @@
     background:var(--sky-600);color:#fff;font:700 11px/1 'Oswald',sans-serif;letter-spacing:.02em;
     border:2px solid #fff;box-shadow:0 2px 6px rgba(12,39,64,.35);white-space:nowrap;}
   .mk.multi{font-size:10px;letter-spacing:.04em;}
-  .mk.first{background:var(--ok);} .mk.last{background:var(--bad);}
+  .mk.reg{background:var(--ok);}
+  .mk.rev{background:var(--warn);color:#4a3b00;}
+  .mk.start{box-shadow:0 0 0 3px rgba(20,52,77,.55),0 2px 6px rgba(12,39,64,.35);}
   .step-row .sn.multi{width:auto;min-width:26px;padding:0 6px;border-radius:99px;font-size:9.5px;}
+  .step-row .sn.reg{background:var(--ok);}
+  .step-row .sn.rev{background:var(--warn);color:#4a3b00;}
   .leaflet-container{font-family:var(--body);}
   .mpop{font:400 12px/1.5 var(--body);}
   .mpop b{font:600 12.5px var(--body);}
@@ -311,7 +318,7 @@
    ITN Household Registration — HHR app
    HHR01 … HHR100 · 10 days · 25 households per day
    ========================================================= */
-const APP_VERSION='2026.07.30n';
+const APP_VERSION='2026.07.30o';
 
 /* =========================================================
    BACKEND — the deployed submission endpoint. It is baked in, so a
@@ -857,11 +864,21 @@ const LEAFLET_JS ='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
 let trackDay=0, lmap=null, lloading=false;
 
 /* the points of one day, in registration order, GPS only */
+/* A registered household is drawn at the point taken when it was registered; a
+   household still waiting for a revisit is drawn at the point taken on the visit
+   where nobody was home. Registering it later turns that marker from yellow to
+   green on its own, because the record stops being a revisit. */
 function trackPoints(d){
   const out=[];
   for(let h=1;h<=PER_DAY;h++){
     const r=recGet(d,h);
-    if(r&&r.gpsLat!==''&&r.gpsLat!=null) out.push({h:h,lat:+r.gpsLat,lng:+r.gpsLng,acc:r.gpsAcc,r:r});
+    if(!r) continue;
+    if(isRevisit(r)){
+      if(r.revisitLat!==''&&r.revisitLat!=null)
+        out.push({h:h,lat:+r.revisitLat,lng:+r.revisitLng,acc:r.revisitAcc,r:r,rev:true});
+    } else if(r.gpsLat!==''&&r.gpsLat!=null){
+      out.push({h:h,lat:+r.gpsLat,lng:+r.gpsLng,acc:r.gpsAcc,r:r,rev:false});
+    }
   }
   return out;
 }
@@ -931,9 +948,11 @@ function renderTrack(d){
     const gap=i?metres(pts[i-1],p):0;
     const g=groupOf(groups,p.h);
     const with_=g&&g.hs.length>1?g.hs.filter(x=>x!==p.h):[];
+    const who = p.rev ? 'Revisit \u00b7 nobody available'
+                      : esc((p.r.first||'')+' '+(p.r.last||''))+' \u00b7 '+esc(p.r.token||'');
     steps+=`<div class="step-row">
-      <span class="sn ${i===0?'first':(i===pts.length-1?'last':'')}">${p.h}</span>
-      <span class="sm"><span class="t">${esc((p.r.first||'')+' '+(p.r.last||''))} \u00b7 ${esc(p.r.token||'')}</span>
+      <span class="sn ${p.rev?'rev':'reg'}${i===0?' start':''}">${p.h}</span>
+      <span class="sm"><span class="t">${who}</span>
         <span class="s">${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}${p.acc?' (\u00b1'+p.acc+' m)':''}${hhmm(p.r.gpsAt)?' \u00b7 '+hhmm(p.r.gpsAt):''}${with_.length?' \u00b7 same point as '+with_.join(', '):''}</span></span>
       <span class="sg">${i?'+'+asDist(gap):'start'}</span></div>`;
   });
@@ -945,13 +964,16 @@ function renderTrack(d){
     <div class="body"><div class="list">
       <div class="daybar">${chips.join('')}</div>
       ${pts.length?`<div class="stat-grid">
-          <div class="stat"><div class="n">${pts.length}</div><div class="l">Households mapped on Day ${d}</div></div>
+          <div class="stat"><div class="n">${pts.length}</div><div class="l">Households mapped on Day ${d}${pts.filter(p=>p.rev).length?' ('+pts.filter(p=>p.rev).length+' revisit)':''}</div></div>
           <div class="stat"><div class="n g">${asDist(pathLength(pts))}</div><div class="l">Distance along the route</div></div>
         </div>
         ${shared.length?`<div class="sync-bar wait"><span class="d"></span>
           <div class="t">${shared.length} point${shared.length===1?'':'s'} hold more than one household \u2014 within ${CLUSTER_M} m the GPS cannot separate them, so they share one marker: ${esc(shared.map(g=>g.label).join(' \u00b7 '))}.</div></div>`:''}`:''}
       <div id="map"></div>
       <div id="mapmsg"></div>
+      ${pts.length?`<div class="legend" style="margin:11px 2px 0">
+        <span><i class="mg"></i>Registered</span><span><i class="my"></i>Waiting for a revisit</span>
+        <span><i class="s"></i>First household of the day</span></div>`:''}
       ${pts.length?`<div class="sub" style="margin:15px 0 8px"><b>Household 1 to ${pts[pts.length-1].h}</b>, in the order you registered them.${hhmm(pts[0].r.gpsAt)?' Started '+hhmm(pts[0].r.gpsAt)+', finished '+hhmm(pts[pts.length-1].r.gpsAt)+'.':''}</div>
         <div class="card steps">${steps}</div>`
         :`<div class="sync-bar wait" style="margin-top:13px"><span class="d"></span>
@@ -1001,13 +1023,18 @@ function drawMap(pts){
       L.polyline(line,{color:'#2680bd',weight:3.5,opacity:.9}).addTo(lmap);
       L.polyline(line,{color:'#ffffff',weight:1,opacity:.7,dashArray:'4 7'}).addTo(lmap);
     }
-    const firstH=pts[0].h, lastH=pts[pts.length-1].h;
+    const firstH=pts[0].h;
     groups.forEach(g=>{
-      const k = g.hs.indexOf(firstH)>-1 ? 'first' : (g.hs.indexOf(lastH)>-1 ? 'last' : '');
+      const anyRev=g.items.some(p=>p.rev);
+      const k=(anyRev?'rev':'reg')+(g.hs.indexOf(firstH)>-1?' start':'');
       const multi = g.hs.length>1;
       const w = multi ? 12+g.label.length*7 : 26;
-      const body = g.items.map(p=>`<b>Household ${p.h}</b><br>${esc((p.r.first||'')+' '+(p.r.last||''))}<br>
-          ${esc(p.r.token||'')}<br>${p.r.size||''} people \u00b7 ${p.r.itns||''} ITN${p.r.itns===1?'':'s'}${hhmm(p.r.gpsAt)?' \u00b7 '+hhmm(p.r.gpsAt):''}`).join('<hr style="border:none;border-top:1px solid #dceaf5;margin:7px 0">');
+      const body = g.items.map(p=>p.rev
+        ? `<b>Household ${p.h}</b><br><span style="color:#8a6d00">Revisit \u2014 nobody was available</span><br>
+           Point taken ${hhmm(p.r.revisitAt)||''}`
+        : `<b>Household ${p.h}</b><br>${esc((p.r.first||'')+' '+(p.r.last||''))}<br>
+           ${esc(p.r.token||'')}<br>${p.r.size||''} people \u00b7 ${p.r.itns||''} ITN${p.r.itns===1?'':'s'}${hhmm(p.r.gpsAt)?' \u00b7 '+hhmm(p.r.gpsAt):''}${p.r._wasRevisit==='Yes'?'<br><span style="color:#8a6d00">was a revisit</span>':''}`
+      ).join('<hr style="border:none;border-top:1px solid #dceaf5;margin:7px 0">');
       L.marker([g.lat,g.lng],{icon:L.divIcon({className:'',
           html:`<div class="mk ${k} ${multi?'multi':''}">${esc(g.label)}</div>`,
           iconSize:[w,26],iconAnchor:[w/2,13]}),zIndexOffset:multi?1000:0}).addTo(lmap)
