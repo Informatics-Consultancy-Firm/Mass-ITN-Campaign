@@ -135,6 +135,10 @@
   .hh.done .hn,.hh.done .hs{color:#16744f;}
   .hh.todo .hn,.hh.todo .hs{color:#a33648;}
   .hh.locked .hn,.hh.locked .hs{color:var(--muted);}
+  .tile.revisit{border-color:var(--warn);background:var(--warn-bg);}
+  .tile.revisit .tb{background:var(--warn);color:#fff;}
+  .tile.revisit .tn{color:#8a6d00;}
+  .hh.revisit .hn,.hh.revisit .hs{color:#8a6d00;}
   .hh .pend{position:absolute;top:6px;right:6px;width:7px;height:7px;border-radius:50%;background:var(--warn);
     box-shadow:0 0 0 2px #fff;}
 
@@ -144,6 +148,7 @@
   .legend i.d{background:var(--ok-bg);border-color:var(--ok);}
   .legend i.t{background:var(--bad-bg);border-color:var(--bad);}
   .legend i.l{background:#f1f4f7;border-color:#cfd8e0;}
+  .legend i.r{background:var(--warn-bg);border-color:var(--warn);}
 
   .stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-bottom:15px;}
   .stat{background:var(--white);border:1px solid var(--line);border-radius:15px;padding:14px;box-shadow:var(--sh-sm);}
@@ -178,6 +183,8 @@
   .unit .u{position:absolute;right:13px;top:50%;transform:translateY(-50%);font:600 12px var(--body);color:var(--muted);pointer-events:none;}
   .unit input{padding-right:64px;}
   .err{font:500 11.5px/1.4 var(--body);color:var(--bad);margin-top:8px;}
+  .gps-diag{font:500 9.5px/1.4 var(--body);color:var(--muted);margin-top:9px;word-break:break-word;
+    background:#f4f6f8;border:1px solid #e3e9ee;border-radius:8px;padding:7px 9px;}
   .tok-show{font:700 26px/1.1 var(--disp);letter-spacing:.06em;color:var(--sky-700);background:var(--sky-50);border:1.5px dashed var(--sky-300);border-radius:12px;padding:14px;text-align:center;word-break:break-all;}
 
   .rv-item{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--line);}
@@ -304,7 +311,7 @@
    ITN Household Registration — HHR app
    HHR01 … HHR100 · 10 days · 25 households per day
    ========================================================= */
-const APP_VERSION='2026.07.30l';
+const APP_VERSION='2026.07.30n';
 
 /* =========================================================
    BACKEND — the deployed submission endpoint. It is baked in, so a
@@ -387,6 +394,9 @@ function recSet(d,h,v){ recs[recKeyOf(d,h)]=v; saveRecs(); }
 /* A record is `unsent` before its first successful submission and `changed`
    after an edit. Both mean the same thing to the sender: push it again. */
 function needsSend(r){ return !!r && (!r._submitted || !!r._dirty); }
+function isRevisit(r){ return !!r && r._status==='Revisit'; }
+function revisitCount(d){ let n=0; for(let h=1;h<=PER_DAY;h++) if(isRevisit(recGet(d,h))) n++; return n; }
+function revisitTotal(){ let n=0; for(let d=1;d<=DAYS;d++) n+=revisitCount(d); return n; }
 function dayRecs(d){ const out=[]; for(let h=1;h<=PER_DAY;h++){ const r=recGet(d,h); if(r) out.push(r); } return out; }
 function dayToSend(d){ return dayRecs(d).filter(needsSend); }
 function daySubmitted(d){ return dayComplete(d) && dayToSend(d).length===0; }
@@ -606,7 +616,7 @@ function renderMenu(){
         <span class="mi b">${I.clip}</span>
         <span class="mt"><h3>Registration</h3>
           <span>Register households day by day, 25 a day.</span>
-          <span class="mm">${t} of ${all} done \u00b7 you are on Day ${cur}</span></span>
+          <span class="mm">${t} of ${all} done \u00b7 Day ${cur}${revisitTotal()?' \u00b7 '+revisitTotal()+' revisit'+(revisitTotal()===1?'':'s'):''}</span></span>
         <span class="ma">${I.arrow}</span></button>
       <button class="menu-card" onclick="renderTrack(0)">
         <span class="mi g">${I.pin}</span>
@@ -663,6 +673,51 @@ function renderDays(){
       <div class="grid g2">${tiles}</div>
     </div></div>`;
 }
+
+/* Everything on the device that still has to reach NMDR, in day order. */
+function allToSend(){
+  const out=[];
+  for(let d=1;d<=DAYS;d++) dayToSend(d).forEach(r=>out.push(r));
+  return out;
+}
+/* Records are saved first and sent when they can be. This pushes whatever is
+   waiting: on load, when the browser comes back online, when the app returns to
+   the foreground, and once a minute as a safety net. */
+let autoBusy=false;
+function autoSync(cb){
+  if(autoBusy||!GAS_URL||!navigator.onLine){ cb&&cb(0); return; }
+  const q=allToSend();
+  if(!q.length){ cb&&cb(0); return; }
+  autoBusy=true;
+  let i=0, sent=0;
+  const step=()=>{
+    if(i>=q.length){
+      autoBusy=false; saveRecs();
+      if(sent) refreshAfterSync();
+      cb&&cb(sent); return;
+    }
+    const rec=q[i];
+    sendRec(rec,(ok,status)=>{
+      if(ok){ rec._submitted=true; rec._dirty=false; rec._submittedAt=new Date().toISOString(); sent++; }
+      else rec._lastError=status||'failed';
+      saveRecs(); i++;
+      if(!ok&&!navigator.onLine){ autoBusy=false; cb&&cb(sent); return; }
+      setTimeout(step,250);
+    });
+  };
+  step();
+}
+/* only redraw a screen that is actually showing sync state */
+function refreshAfterSync(){
+  if(document.querySelector('.sync-bar')){
+    if(document.querySelector('.dayrow')) renderAchv();
+    else if(document.querySelector('.grid.g4')) renderDay(formD||currentDay());
+    else if(document.querySelector('.menu-card')) renderMenu();
+  }
+}
+window.addEventListener('online',()=>{ toast('Back online \u2014 sending what is waiting'); autoSync(n=>{ if(n) toast(n+' record'+(n===1?'':'s')+' sent to NMDR'); }); });
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden) autoSync(); });
+setInterval(()=>autoSync(),60000);
 
 /* Days finished but not yet in NMDR. */
 function outstandingDays(){
@@ -974,9 +1029,9 @@ function renderDay(d){
   let tiles='';
   for(let h=1;h<=PER_DAY;h++){
     const ok=isDone(d,h), open=hhOpen(d,h);
-    const rec=recGet(d,h), pend=ok&&needsSend(rec);
-    const cls = ok?'done' : open?(h===nx?'todo next':'todo') : 'locked todo';
-    const state = ok?(pend?'To send':'Sent') : open?(h===nx?'Next':'To do') : I.lock;
+    const rec=recGet(d,h), pend=ok&&needsSend(rec), rev=isRevisit(rec);
+    const cls = rev?'revisit' : ok?'done' : open?(h===nx?'todo next':'todo') : 'locked todo';
+    const state = rev?'Revisit' : ok?(pend?'To send':'Sent') : open?(h===nx?'Next':'To do') : I.lock;
     tiles+=`<button class="tile hh ${cls}" ${open?`onclick="openHH(${d},${h})"`:`onclick="toast('Household ${h-1} has to be registered first.')"`}>
       ${pend?'<span class="pend"></span>':''}
       <span class="hn">${h}</span><span class="hs">${state}</span></button>`;
@@ -989,9 +1044,9 @@ function renderDay(d){
     </div>
     <div class="body"><div class="list">
       <h2>Day ${d}</h2>
-      <div class="sub">${n} of ${PER_DAY} registered.${nx?' Household '+nx+' is next — they open one at a time, in order.':' Day '+d+' is complete'+(d<DAYS?', Day '+(d+1)+' is now open.':'.')}</div>
+      <div class="sub">${n} of ${PER_DAY} visited${revisitCount(d)?', '+revisitCount(d)+' waiting for a revisit':''}.${nx?' Household '+nx+' is next — they open one at a time, in order.':' Day '+d+' is complete'+(d<DAYS?', Day '+(d+1)+' is now open.':'.')}</div>
       ${daySubmitBar(d)}
-      <div class="legend"><span><i class="d"></i>Registered</span><span><i class="t"></i>Not registered</span><span><i class="l"></i>Locked</span></div>
+      <div class="legend"><span><i class="d"></i>Registered</span><span><i class="r"></i>Revisit</span><span><i class="t"></i>Not registered</span><span><i class="l"></i>Locked</span></div>
       <div class="grid g4">${tiles}</div>
     </div></div>`;
 }
@@ -1047,6 +1102,84 @@ function doneSubmit(d,sent,failed){
     </div>`);
 }
 
+
+/* =========================================================
+   REVISIT — coming back to a household nobody was home at
+   ---------------------------------------------------------
+   The registrar has to be standing at the household to open it: a fresh
+   fix must be within REVISIT_M of the point taken on the first visit.
+   ========================================================= */
+const REVISIT_M=50;
+function renderRevisitCard(){
+  const d=formD,h=formH,r=recGet(d,h)||{};
+  app.innerHTML=`<div class="appbar">
+      <button class="ico-btn" onclick="renderDay(${d})">${I.back}</button>
+      <div class="titles"><div class="eyebrow">${esc(me)} \u00b7 Day ${d}</div><div class="title">Household ${h} \u00b7 revisit</div></div>
+      <span class="tag-pill me">${hhSerial(d,h)}/${DAYS*PER_DAY}</span>
+    </div>
+    <div class="body"><div class="list">
+      <div class="hd-head" style="background:linear-gradient(160deg,#e0a100,#a67c00)">
+        <div class="id">Revisit</div>
+        <div class="meta">Nobody was available on ${esc(String(r._ts||'').slice(0,10))}.<br>
+          Point taken: ${esc(r.revisitLat)}, ${esc(r.revisitLng)} (\u00b1${esc(r.revisitAcc)} m)</div></div>
+      ${r._submitted?`<div class="sync-bar ok"><span class="d"></span><div class="t"><b>The revisit is in NMDR.</b></div></div>`
+        :`<div class="sync-bar warn"><span class="d"></span><div class="t"><b>Saved on this device.</b><br>It goes to NMDR on its own as soon as there is internet.</div></div>`}
+      <div class="note">To register this household you must be at it. Tap below while you are standing there \u2014 your position is checked against the point taken on the first visit, and must be within ${REVISIT_M} m.</div>
+      <div id="gate"></div>
+    </div></div>
+    <div class="footer">
+      <button class="btn btn-ghost btn-sm" onclick="renderDay(${d})">Day ${d}</button>
+      <button class="btn btn-ok" onclick="revisitGate()">I am at the household</button>
+    </div>`;
+}
+/* The tap that starts this is also the user gesture the browser wants before
+   it will raise a permission box. */
+function revisitGate(){
+  const d=formD,h=formH,r=recGet(d,h)||{};
+  modal(`<h3>Checking you are at the household</h3><div class="spin"></div>
+    <p style="text-align:center">Taking your position\u2026</p>`);
+  gpsFix=null; gpsState='idle';
+  beginGps();
+  const t0=Date.now();
+  const tick=()=>{
+    if(gpsState==='ok'&&gpsFix){ gateResult(gpsFix,r); return; }
+    if(gpsState==='fail'){
+      modal(`<h3>No GPS point yet</h3><p>${esc(gpsErr)} ${esc(gpsHint.replace(/<[^>]+>/g,''))}</p>
+        <div class="acts">
+          <button class="btn btn-ghost" onclick="closeModal()">Close</button>
+          <button class="btn btn-primary" onclick="revisitGate()">Try again</button>
+        </div>`);
+      return;
+    }
+    if(Date.now()-t0>45000){
+      modal(`<h3>Still no position</h3><p>The check needs a GPS point. Step into the open and try again.</p>
+        <div class="acts"><button class="btn btn-ghost" onclick="closeModal()">Close</button>
+        <button class="btn btn-primary" onclick="revisitGate()">Try again</button></div>`);
+      return;
+    }
+    setTimeout(tick,300);
+  };
+  setTimeout(tick,200);
+}
+function gateResult(fix,r){
+  const away=metres({lat:Number(r.revisitLat),lng:Number(r.revisitLng)},{lat:fix.lat,lng:fix.lng});
+  if(away>REVISIT_M){
+    modal(`<h3>You are not at the household</h3>
+      <p>You are about <b>${asDist(away)}</b> from the point taken on the first visit. Go to where you took that GPS point before, then take it again.</p>
+      <div class="err">Household ${formH} cannot be opened from here.</div>
+      <div class="acts">
+        <button class="btn btn-ghost" onclick="closeModal()">Close</button>
+        <button class="btn btn-primary" onclick="revisitGate()">Take it again</button>
+      </div>`);
+    return;
+  }
+  closeModal();
+  /* at the household: open the full form, keeping the first-visit point */
+  showErr=false; editing=false;
+  form={hhrPhone:Store.get('itn_hhr_phone_'+me,'')};
+  renderForm();
+  toast('You are '+asDist(away)+' from the first point \u2014 carry on');
+}
 /* =========================================================
    ONE HOUSEHOLD
    ========================================================= */
@@ -1055,27 +1188,32 @@ function doneSubmit(d,sent,failed){
    alternative either, the registrar's own number is recorded so the household
    can still be reached through them. */
 const FORM=[
-  {id:'first', n:1, q:'First name of household head', type:'text', ph:'First name'},
-  {id:'last',  n:2, q:'Last name of household head',  type:'text', ph:'Last name'},
-  {id:'hasPhone', n:3, q:'Do you have a telephone number?', type:'yn'},
-  {id:'phone',       q:'Telephone number', type:'tel', ph:'e.g. 076 123456',
-     when:a=>a.hasPhone==='Yes'},
+  {id:'adults', n:1, q:'Are adults available in the household to do the registration?', type:'yn',
+     help:'If nobody is there, take the GPS point and mark the household for a revisit.'},
+  {id:'first', n:2, q:'First name of household head', type:'text', ph:'First name', when:a=>a.adults==='Yes'},
+  {id:'last',  n:3, q:'Last name of household head',  type:'text', ph:'Last name',  when:a=>a.adults==='Yes'},
+  {id:'hasPhone', n:4, q:'Do you have a telephone number?', type:'yn', when:a=>a.adults==='Yes'},
+  {id:'phone',       q:'Telephone number', type:'tel', ph:'076123456',
+     when:a=>a.adults==='Yes'&&a.hasPhone==='Yes'},
   {id:'hasAlt',      q:'Do you have someone else\u2019s number you can give if we want to call you?', type:'yn',
-     when:a=>a.hasPhone==='No'},
-  {id:'altPhone',    q:'Telephone number of that person', type:'tel', ph:'e.g. 076 123456',
-     when:a=>a.hasPhone==='No'&&a.hasAlt==='Yes'},
+     when:a=>a.adults==='Yes'&&a.hasPhone==='No'},
+  {id:'altPhone',    q:'Telephone number of that person', type:'tel', ph:'076123456',
+     when:a=>a.adults==='Yes'&&a.hasPhone==='No'&&a.hasAlt==='Yes'},
   {id:'hhrPhone',    q:'HHR telephone number', type:'tel', ph:'Your own number',
      help:'The household has no number to give, so your number is recorded as the contact.',
-     when:a=>a.hasPhone==='No'&&a.hasAlt==='No'},
-  {id:'size',  n:4, q:'Number of people in the household', type:'int', unit:'people', min:1, max:60},
-  {id:'itns',  n:5, q:'ITNs to be given', type:'calc',
+     when:a=>a.adults==='Yes'&&a.hasPhone==='No'&&a.hasAlt==='No'},
+  {id:'size',  n:5, q:'Number of people in the household', type:'int', unit:'people', min:1, max:60,
+     when:a=>a.adults==='Yes'},
+  {id:'itns',  n:6, q:'ITNs to be given', type:'calc',
      help:'1 to 2 people = 1 ITN, 3 to 4 = 2 ITNs, 5 or more = 3 ITNs.',
-     from:a=>itnsFor(a.size)},
-  {id:'u5',    n:6, q:'How many under-fives are in the household?', type:'int', unit:'under-fives', min:0, max:30},
-  {id:'preg',  n:7, q:'How many pregnant women are in the household?', type:'int', unit:'pregnant women', min:0, max:20},
-  {id:'token', n:8, q:'Household token', type:'calc',
+     from:a=>itnsFor(a.size), when:a=>a.adults==='Yes'},
+  {id:'u5',    n:7, q:'How many under-fives are in the household?', type:'int', unit:'under-fives', min:0, max:30,
+     when:a=>a.adults==='Yes'},
+  {id:'preg',  n:8, q:'How many pregnant women are in the household?', type:'int', unit:'pregnant women', min:0, max:20,
+     when:a=>a.adults==='Yes'},
+  {id:'token', n:9, q:'Household token', type:'calc',
      help:'Generated from your HHR ID, the household number and the head\u2019s initials.',
-     from:a=>a._token||''}
+     from:a=>a._token||'', when:a=>a.adults==='Yes'}
 ];
 function itnsFor(size){
   const n=parseInt(size,10);
@@ -1092,23 +1230,29 @@ function tokenFor(id,d,h,first,last){
   return id+'_'+hhSerial(d,h)+'_'+ini.toUpperCase();
 }
 const digits=v=>String(v||'').replace(/\D/g,'');
+const PHONE_LEN=9;
 function visibleQs(a){ return FORM.filter(q=>!q.when||q.when(a)); }
 function fieldErr(q,a){
   if(q.type==='calc') return '';
   const v=a[q.id];
   if(v===undefined||v===null||String(v).trim()==='') return 'Required.';
-  if(q.type==='tel'&&digits(v).length<6) return 'Enter a full telephone number.';
+  if(q.type==='tel'){
+    const n=digits(v).length;
+    if(n<PHONE_LEN) return 'A telephone number is exactly '+PHONE_LEN+' digits \u2014 this one has '+n+'.';
+    if(n>PHONE_LEN) return 'A telephone number is exactly '+PHONE_LEN+' digits.';
+  }
   if(q.type==='int'){
     const n=Number(v);
     if(!Number.isInteger(n)) return 'Whole numbers only.';
     if(q.min!=null&&n<q.min) return 'Cannot be less than '+q.min+'.';
     if(q.max!=null&&n>q.max) return 'Cannot be more than '+q.max+'.';
   }
-  if(q.id==='u5'&&a.size!==undefined&&String(a.size).trim()!==''){
-    if(Number(v)>Number(a.size)) return 'More under-fives than people in the household.';
-  }
-  if(q.id==='preg'&&a.size!==undefined&&String(a.size).trim()!==''){
-    if(Number(v)>Number(a.size)) return 'More pregnant women than people in the household.';
+  /* under-fives and pregnant women are both counted among the household, so
+     together they cannot outnumber it */
+  if((q.id==='u5'||q.id==='preg')&&a.size!==undefined&&String(a.size).trim()!==''){
+    const u=Number(a.u5), p=Number(a.preg), size=Number(a.size);
+    if(!isNaN(u)&&!isNaN(p)&&u+p>size)
+      return 'Under-fives ('+u+') and pregnant women ('+p+') come to '+(u+p)+', more than the '+size+' people in the household.';
   }
   return '';
 }
@@ -1121,21 +1265,22 @@ let form={}, formD=0, formH=0, showErr=false, editing=false;
    by the time the token has been written and submission reaches the GPS step it
    is almost always already captured. It stays LAST in the flow — nothing is
    saved before it — but the wait moves off the end of the interview. */
-let gpsFix=null, gpsState='idle', gpsErr='', gpsHint='';
-let gpsWatch=null, gpsT0=0, gpsTick=null, gpsQuick=false;
+let gpsFix=null, gpsState='idle', gpsErr='', gpsHint='', gpsNext=null;
+let gpsWatch=null, gpsT0=0, gpsTick=null;
 const GPS_GOOD=25;        /* metres: accurate enough to stop chasing a better one */
 const GPS_BUDGET=60000;   /* keep trying to improve for this long, then settle */
 
-/* Why a fix might be impossible before we even ask. The https one matters:
-   browsers refuse geolocation on a page that is not in a secure context, which
-   is what happens when the file is opened from a download instead of its
-   web address — and the failure looks exactly like a bad GPS signal. */
-function gpsSupportProblem(){
-  if(!navigator.geolocation) return 'This browser has no location support.';
-  if(window.isSecureContext===false)
-    return 'The browser blocks location on a page that is not https. Open the app from its web address, not from a downloaded copy of the file.';
-  return '';
+/* Diagnostics for the field: whatever the browser actually told us, kept so a
+   registrar can read it back over the phone instead of "it does not work". */
+let gpsDiag='';
+function gpsContext(){
+  const secure=(window.isSecureContext!==false);
+  return (location.protocol||'?')+(secure?' · secure':' · NOT secure');
 }
+/* Two things stop a fix before the signal is ever involved, and both look like
+   bad GPS: a page that is not https, and a permission prompt the browser will
+   not show without a tap. Neither is a reason to refuse to try — we attempt
+   anyway and keep a button so the registrar can trigger it by hand. */
 function gpsStop(){
   if(gpsWatch!=null&&navigator.geolocation&&navigator.geolocation.clearWatch){
     try{ navigator.geolocation.clearWatch(gpsWatch); }catch(e){}
@@ -1153,16 +1298,20 @@ function gpsSecs(){ return gpsT0?Math.round((Date.now()-gpsT0)/1000):0; }
 function beginGps(){
   if(editing) return;
   gpsStop();
-  const problem=gpsSupportProblem();
-  if(problem){ gpsState='fail'; gpsErr=problem; gpsHint=''; paintGps(); return; }
-  gpsFix=null; gpsState='getting'; gpsErr=''; gpsHint=''; gpsT0=Date.now(); gpsQuick=false;
+  if(!navigator.geolocation){
+    gpsState='fail'; gpsErr='This browser has no location support.'; gpsHint='';
+    gpsDiag='no navigator.geolocation · '+gpsContext(); paintGps(); return;
+  }
+  gpsFix=null; gpsState='getting'; gpsErr=''; gpsHint=''; gpsDiag=''; gpsT0=Date.now();
   paintGps();
 
   /* 1 — fast and rough: happy with a cached or network-derived position */
-  navigator.geolocation.getCurrentPosition(
-    p=>{ gpsQuick=true; gpsTake(p); },
-    ()=>{},                                  /* its failure is not fatal, the watch continues */
-    {enableHighAccuracy:false, timeout:15000, maximumAge:120000});
+  try{
+    navigator.geolocation.getCurrentPosition(
+      p=>gpsTake(p),
+      ()=>{},                                /* its failure is not fatal, the watch continues */
+      {enableHighAccuracy:false, timeout:15000, maximumAge:120000});
+  }catch(e){}
 
   /* 2 — the real thing, reporting repeatedly as the fix sharpens */
   try{
@@ -1171,8 +1320,10 @@ function beginGps(){
       e=>gpsProblem(e),
       {enableHighAccuracy:true, timeout:45000, maximumAge:0});
   }catch(e){
-    navigator.geolocation.getCurrentPosition(p=>gpsTake(p),e2=>gpsProblem(e2),
-      {enableHighAccuracy:true, timeout:45000, maximumAge:0});
+    try{
+      navigator.geolocation.getCurrentPosition(p=>gpsTake(p),e2=>gpsProblem(e2),
+        {enableHighAccuracy:true, timeout:45000, maximumAge:0});
+    }catch(e2){ gpsProblem({code:0,message:String(e2&&e2.message||e2)}); }
   }
 
   /* the card counts up while it searches, so a long wait looks like progress
@@ -1184,7 +1335,8 @@ function beginGps(){
       else if(gpsState==='getting'){
         gpsState='fail';
         gpsErr='No location after '+Math.round(GPS_BUDGET/1000)+' seconds.';
-        gpsHint='Step into the open, away from walls and roofs, and try again.';
+        gpsHint='Tap <b>Take the GPS point</b> below. If a permission box appears, allow it. Then step into the open, away from walls and roofs.';
+        gpsDiag='no response · '+gpsContext();
         gpsStop();
       }
       paintGps();
@@ -1196,25 +1348,35 @@ function gpsTake(p){
   const f={lat:+p.coords.latitude.toFixed(6), lng:+p.coords.longitude.toFixed(6),
            acc:Math.round(p.coords.accuracy||0), at:new Date().toISOString()};
   if(!gpsFix||f.acc<=gpsFix.acc) gpsFix=f;      /* keep the sharpest reading */
-  gpsState='ok'; gpsErr=''; gpsHint='';
+  gpsState='ok'; gpsErr=''; gpsHint=''; gpsDiag='';
   if(gpsFix.acc<=GPS_GOOD||Date.now()-gpsT0>GPS_BUDGET) gpsStop();
   paintGps();
 }
 function gpsProblem(e){
   if(gpsFix){ gpsStop(); return; }             /* already have a point — ignore */
   const code=e&&e.code;
+  const insecure=(window.isSecureContext===false);
   gpsState='fail';
   if(code===1){
-    gpsErr='Location permission was refused.';
-    gpsHint='Allow location for this site in the browser, then try again. On Android it is the padlock or the (i) beside the address, then Permissions. Check location is also on in the phone settings.';
+    gpsErr='The browser did not give permission.';
+    gpsHint=insecure
+      ? 'This page is not on https, and browsers refuse location there. Open the app from its https web address rather than a downloaded copy of the file.'
+      : 'Tap <b>Take the GPS point</b> below and allow location when the box appears. If no box appears, allow it from the padlock or (i) beside the address, and check location is on in the phone settings.';
   } else if(code===2){
     gpsErr='The device cannot work out where it is.';
-    gpsHint='Turn location on in the phone settings, step into the open, and try again. Indoors it often fails.';
+    gpsHint='Turn location on in the phone settings, step into the open, and tap <b>Take the GPS point</b>. Indoors it often fails.';
   } else {
     gpsErr='Location is taking too long.';
-    gpsHint='Step into the open, away from walls and roofs, and try again.';
+    gpsHint='Step into the open, away from walls and roofs, then tap <b>Take the GPS point</b>.';
   }
+  gpsDiag='code '+(code==null?'?':code)+(e&&e.message?' · '+e.message:'')+' · '+gpsContext();
   gpsStop(); paintGps();
+}
+/* Always one tap away. Some browsers will not raise the permission box unless
+   the request comes from a tap, so the automatic attempt on its own is not
+   enough — this button is the gesture. */
+function gpsButton(label,kind){
+  return `<button class="btn ${kind||'btn-primary'} btn-block btn-sm" style="margin-top:9px" onclick="beginGps()">${label}</button>`;
 }
 function gpsCard(){
   const secs=gpsSecs();
@@ -1222,14 +1384,16 @@ function gpsCard(){
     gpsState==='ok'
       ? `<div class="gps-ok">Captured \u00b7 ${gpsFix.lat}, ${gpsFix.lng} (\u00b1${gpsFix.acc} m)</div>
          ${gpsWatch!=null?`<div class="q-help" style="margin:8px 0 0">Still sharpening the point \u2014 you can carry on, the best reading is kept.</div>`:''}
-         ${gpsFix.acc>GPS_GOOD&&gpsWatch==null?`<div class="q-help" style="margin:8px 0 0">\u00b1${gpsFix.acc} m is rough. Fine to submit, or <b>try again</b> in the open for a tighter point.</div>
-           <button class="btn btn-ghost btn-block btn-sm" style="margin-top:9px" onclick="beginGps()">Try again</button>`:''}`
+         ${gpsFix.acc>GPS_GOOD&&gpsWatch==null?`<div class="q-help" style="margin:8px 0 0">\u00b1${gpsFix.acc} m is rough. Fine to submit, or take it again in the open for a tighter point.</div>
+           ${gpsButton('Take the GPS point again','btn-ghost')}`:''}`
   : gpsState==='fail'
       ? `<div class="err">${esc(gpsErr)} A point is needed before this household can be registered.</div>
-         ${gpsHint?`<div class="q-help" style="margin:8px 0 0">${esc(gpsHint)}</div>`:''}
-         <button class="btn btn-primary btn-block btn-sm" style="margin-top:9px" onclick="beginGps()">Try again</button>`
+         ${gpsHint?`<div class="q-help" style="margin:8px 0 0">${gpsHint}</div>`:''}
+         ${gpsButton('Take the GPS point')}
+         ${gpsDiag?`<div class="gps-diag">${esc(gpsDiag)}</div>`:''}`
   :       `<div class="sync-bar wait" style="margin:0"><span class="d"></span>
-            <div class="t">Looking for the location\u2026 ${secs}s. Carry on with the questions \u2014 it keeps searching in the background.</div></div>`;
+            <div class="t">Looking for the location\u2026 ${secs}s. Carry on with the questions \u2014 it keeps searching in the background.</div></div>
+           ${secs>=8?gpsButton('Take the GPS point now','btn-ghost'):''}`;
   return `<div class="q-card" id="qc_gps">
     <span class="q-no">GPS</span>
     <div class="q-txt">Location of the household</div>
@@ -1243,7 +1407,11 @@ function openHH(d,h){
   formD=d; formH=h; showErr=false; editing=false;
   form=Object.assign({},recGet(d,h));
   if(!form.hhrPhone) form.hhrPhone=Store.get('itn_hhr_phone_'+me,'');
-  if(isDone(d,h)){ gpsStop(); gpsFix=null; gpsState='idle'; renderSaved(); return; }
+  if(isDone(d,h)){
+    gpsStop(); gpsFix=null; gpsState='idle';
+    isRevisit(recGet(d,h)) ? renderRevisitCard() : renderSaved();
+    return;
+  }
   renderForm();
   beginGps();          /* start the fix now, not at the end */
 }
@@ -1274,7 +1442,7 @@ function ctl(q){
   }
   const t=q.type==='tel'?'tel':q.type==='int'?'number':'text';
   const attrs=[q.min!=null?`min="${q.min}"`:'',q.max!=null?`max="${q.max}"`:'',q.type==='int'?'step="1" inputmode="numeric"':'',
-               q.type==='tel'?'inputmode="tel"':'',q.ph?`placeholder="${esc(q.ph)}"`:''].join(' ');
+               q.type==='tel'?`inputmode="numeric" maxlength="${PHONE_LEN}"`:'',q.ph?`placeholder="${esc(q.ph)}"`:''].join(' ');
   const inp=`<input type="${t}" ${attrs} data-k="${q.id}" value="${esc(v)}">`;
   return q.unit?`<div class="field unit">${inp}<span class="u">${esc(q.unit)}</span></div>`:`<div class="field">${inp}</div>`;
 }
@@ -1322,6 +1490,12 @@ function wireForm(){
   b.addEventListener('input',e=>{
     const i=e.target.closest('[data-k]'); if(!i) return;
     const k=i.dataset.k;
+    const qq=FORM.find(x=>x.id===k);
+    if(qq&&qq.type==='tel'){                     /* digits only, never more than 9 */
+      const clean=digits(i.value).slice(0,PHONE_LEN);
+      if(i.value!==clean){ const at=i.selectionStart; i.value=clean;
+        try{ i.setSelectionRange(Math.min(at,clean.length),Math.min(at,clean.length)); }catch(_){} }
+    }
     form[k]=i.value;
     const card=document.getElementById('qc_'+k);
     if(card){ card.classList.remove('missing'); const er=card.querySelector('.err'); if(er) er.remove(); }
@@ -1347,6 +1521,8 @@ function submitHH(){
   }
   showErr=false;
   if(editing){ saveEdit(); return; }
+  /* nobody home: no names, no token — just the point and a revisit flag */
+  if(form.adults==='No'){ gpsStep(finishRevisit); return; }
   tokenStep(false);
 }
 /* An edit keeps the record's _id, token and GPS point, bumps its revision and
@@ -1396,8 +1572,9 @@ function tokenStep(again){
 }
 /* Step 2 — the GPS point. Usually already in hand, so this passes straight
    through; otherwise it waits for the fix that is already being taken. */
-function gpsStep(){
-  if(gpsState==='ok'&&gpsFix){ finish(gpsFix); return; }
+function gpsStep(next){
+  gpsNext = (typeof next==='function') ? next : finish;
+  if(gpsState==='ok'&&gpsFix){ gpsNext(gpsFix); return; }
   /* a fix that failed earlier in the interview gets one fresh attempt now —
      the registrar may well have moved outside since */
   if(gpsState!=='getting') beginGps();
@@ -1405,7 +1582,7 @@ function gpsStep(){
     <p style="text-align:center" id="gpsWait">Everything else is ready. Step into the open if you can \u2014 the household is saved the moment a point comes in.</p>`);
   const t0=Date.now();
   const tick=()=>{
-    if(gpsState==='ok'&&gpsFix){ finish(gpsFix); return; }
+    if(gpsState==='ok'&&gpsFix){ gpsNext(gpsFix); return; }
     if(gpsState==='fail'){ gpsFail(gpsErr||'GPS could not get a fix.'); return; }
     if(Date.now()-t0>30000){ gpsFail('GPS is taking too long.'); return; }
     setTimeout(tick,250);
@@ -1420,20 +1597,25 @@ function gpsFail(msg){
     <div class="err">Household ${formH} is not registered.</div>
     <div class="acts">
       <button class="btn btn-ghost" onclick="closeModal();paintGps()">Not now</button>
-      <button class="btn btn-primary" onclick="beginGps();gpsStep()">Try again</button>
+      <button class="btn btn-primary" onclick="beginGps();gpsStep(gpsNext)">Try again</button>
     </div>`);
 }
 function finish(gps){
   const d=formD,h=formH;
+  const was=recGet(d,h)||{};          /* a revisit being completed keeps its first point */
   const rec=Object.assign({},form,{
+    _status:'Registered',
+    revisitLat:was.revisitLat||'', revisitLng:was.revisitLng||'',
+    revisitAcc:was.revisitAcc||'', revisitAt:was.revisitAt||'',
+    _wasRevisit:isRevisit(was)?'Yes':'',
     _id:me+'-D'+d+'-H'+h,          /* stable — a resubmission updates this row */
     _hhr:me, _day:d, _hh:h, _serial:hhSerial(d,h),
     _district:(hhrPlace(me)||{}).district||'', _chiefdom:(hhrPlace(me)||{}).chiefdom||'',
     _phu:(hhrPlace(me)||{}).phu||'', _phuCode:(hhrPlace(me)||{}).phuCode||'',
     token:form._token, itns:itnsFor(form.size),
     gpsLat:gps.lat, gpsLng:gps.lng, gpsAcc:gps.acc, gpsAt:gps.at,
-    _rev:1, _submitted:false, _dirty:false, _submittedAt:'',
-    _ts:new Date().toISOString()
+    _rev:(was._rev||0)+1, _submitted:false, _dirty:false, _submittedAt:'',
+    _ts:was._ts||new Date().toISOString(), _registeredAt:new Date().toISOString()
   });
   delete rec._token;
   if(rec.hhrPhone) Store.set('itn_hhr_phone_'+me,rec.hhrPhone);
@@ -1451,6 +1633,49 @@ function finish(gps){
     savedModal(rec,ok?'sent':'failed');
   });
 }
+/* Nobody was home. The point is taken so the household can be found again, and
+   the card turns yellow until someone comes back to it. */
+function finishRevisit(gps){
+  const d=formD,h=formH;
+  const rec={
+    _id:me+'-D'+d+'-H'+h, _hhr:me, _day:d, _hh:h, _serial:hhSerial(d,h),
+    _district:(hhrPlace(me)||{}).district||'', _chiefdom:(hhrPlace(me)||{}).chiefdom||'',
+    _phu:(hhrPlace(me)||{}).phu||'', _phuCode:(hhrPlace(me)||{}).phuCode||'',
+    _status:'Revisit', adults:'No', token:'',
+    revisitLat:gps.lat, revisitLng:gps.lng, revisitAcc:gps.acc, revisitAt:gps.at,
+    gpsLat:'', gpsLng:'', gpsAcc:'', gpsAt:'',
+    _rev:1, _submitted:false, _dirty:false, _submittedAt:'',
+    _ts:new Date().toISOString()
+  };
+  recSet(d,h,rec);
+  setDone(d,h,true);
+  gpsStop(); gpsFix=null; gpsState='idle';
+  closeModal();
+  revisitModal(rec,'sending');
+  if(!GAS_URL||!navigator.onLine){ revisitModal(rec,'queued'); return; }
+  sendRec(rec,(ok,status)=>{
+    if(ok){ rec._submitted=true; rec._dirty=false; rec._submittedAt=new Date().toISOString(); }
+    else rec._lastError=status||'failed';
+    saveRecs();
+    revisitModal(rec,ok?'sent':'queued');
+  });
+}
+function revisitModal(rec,state){
+  const d=rec._day,h=rec._hh;
+  const line =
+    state==='sending' ? `<div class="sync-bar wait" style="margin:13px 0 0"><span class="d"></span><div class="t">Sending to NMDR\u2026</div></div>`
+  : state==='sent'   ? `<div class="gps-ok" style="margin-top:13px">In NMDR.</div>`
+  :                    `<div class="sync-bar warn" style="margin:13px 0 0"><span class="d"></span>
+        <div class="t"><b>Saved on this device.</b><br>It goes to NMDR on its own as soon as there is internet.</div></div>`;
+  modal(`<h3>Household ${h} marked for revisit</h3>
+    <p>Nobody was available. The GPS point is saved so you can find the household again, and the card stays <b>yellow</b> until it is registered.</p>
+    <div class="gps-ok">Point \u00b7 ${rec.revisitLat}, ${rec.revisitLng} (\u00b1${rec.revisitAcc} m)</div>
+    ${line}
+    <div class="acts">
+      ${state==='sending'?'':`<button class="btn btn-ok btn-block" onclick="closeModal();renderDay(${d})">Back to Day ${d}</button>`}
+    </div>`);
+}
+
 /* The household that was just registered. There is deliberately no shortcut to
    the next one: the registrar goes back to the day and opens the next card. */
 function savedModal(rec,state){
@@ -1549,7 +1774,7 @@ function submitOne(d,h){
 }
 
 /* ---------- start ---------- */
-if(me&&credsFor(me)){ loadDone(); renderMenu(); } else { me=null; renderDistricts(); }
+if(me&&credsFor(me)){ loadDone(); renderMenu(); autoSync(); } else { me=null; renderDistricts(); }
 </script>
 </body>
 </html>
