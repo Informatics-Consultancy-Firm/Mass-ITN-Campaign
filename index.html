@@ -152,6 +152,8 @@
   .legend i.mg{background:var(--ok);border-color:var(--ok);}
   .legend i.my{background:var(--warn);border-color:var(--warn);}
   .legend i.s{background:var(--white);border-color:var(--ink);border-width:2px;}
+  .legend i.tk{background:var(--muted);border-color:var(--muted);height:3px;border-radius:2px;}
+  .legend i.tg{background:transparent;border:none;height:0;border-top:2px dashed #98adbd;border-radius:0;}
 
   .stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px;margin-bottom:15px;}
   .stat{background:var(--white);border:1px solid var(--line);border-radius:15px;padding:14px;box-shadow:var(--sh-sm);}
@@ -205,6 +207,7 @@
   .menu-card .mi.b{background:var(--sky-100);color:var(--sky-600);}
   .menu-card .mi.g{background:var(--ok-bg);color:var(--ok);}
   .menu-card .mi.y{background:var(--warn-bg);color:#b8860b;}
+  .menu-card .mi.s{background:#eaf0f5;color:var(--muted);}
   .menu-card .mt{position:relative;flex:1;min-width:0;}
   .menu-card .mt h3{font:600 17.5px/1.1 var(--disp);letter-spacing:.01em;margin-bottom:4px;}
   .menu-card .mt span{font:400 12px/1.45 var(--body);color:var(--muted);display:block;}
@@ -218,7 +221,7 @@
     border-radius:10px;padding:9px 12px;font:600 12px/1 var(--body);cursor:pointer;}
   .daybar button.on{background:var(--sky-600);border-color:var(--sky-600);color:#fff;}
   .daybar button:disabled{opacity:.42;cursor:not-allowed;}
-  #map{height:clamp(240px,38vh,460px);border-radius:16px;border:1px solid var(--line);overflow:hidden;background:var(--sky-50);box-shadow:var(--sh-sm);}
+  #map,#amap{height:clamp(240px,38vh,460px);border-radius:16px;border:1px solid var(--line);overflow:hidden;background:var(--sky-50);box-shadow:var(--sh-sm);}
   .mk{display:inline-grid;place-items:center;min-width:26px;height:26px;padding:0 7px;border-radius:99px;
     background:var(--sky-600);color:#fff;font:700 11px/1 'Oswald',sans-serif;letter-spacing:.02em;
     border:2px solid #fff;box-shadow:0 2px 6px rgba(12,39,64,.35);white-space:nowrap;}
@@ -318,7 +321,7 @@
    ITN Household Registration — HHR app
    HHR01 … HHR100 · 10 days · 25 households per day
    ========================================================= */
-const APP_VERSION='2026.07.30o';
+const APP_VERSION='2026.08.02a';
 
 /* =========================================================
    BACKEND — the deployed submission endpoint. It is baked in, so a
@@ -383,7 +386,7 @@ const recKey=id=>'itn_hhr_done_'+id;
 GAS_URL=Store.get(URL_KEY,GAS_URL)||GAS_URL;
 let me=Store.get(SESS_KEY,null);      /* the HHR currently logged in */
 let done={};
-function loadDone(){ done = me ? Store.get(recKey(me),{}) : {}; loadRecs(); }
+function loadDone(){ done = me ? Store.get(recKey(me),{}) : {}; loadRecs(); trackLoad(); }
 function saveDone(){ if(me) Store.set(recKey(me),done); }
 function isDone(d,h){ return !!(done[d]&&done[d][h]); }
 function setDone(d,h,v){
@@ -458,6 +461,7 @@ const I={
  pin:'<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11z"/><circle cx="12" cy="10" r="2.6"/></svg>',
  clip:'<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="6" y="4" width="12" height="17" rx="2"/><path d="M9 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1"/><path d="M9 10h6M9 14h6"/></svg>',
  arrow:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>',
+ route:'<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="18.5" r="2.3"/><circle cx="18" cy="5.5" r="2.3"/><path d="M8.2 17.6c2.9-.7 4-1.9 4-3.9 0-2.2-1.6-3.1-3.6-3.6"/><path d="M15.7 6.4c-2.3.8-3.3 1.9-3.5 3.7"/></svg>',
  lock:'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>'
 };
 const app=document.getElementById('app');
@@ -598,7 +602,8 @@ function doLogin(){
 }
 function logout(){
   if(!confirm('Sign out of '+me+'? Registered households stay on this device.')) return;
-  me=null; Store.del(SESS_KEY); done={}; recs={}; renderDistricts();
+  autoStop(true);
+  me=null; Store.del(SESS_KEY); done={}; recs={}; track={}; renderDistricts();
 }
 
 /* where the signed-in registrar is posted, for the screens that show it */
@@ -630,6 +635,13 @@ function renderMenu(){
         <span class="mt"><h3>HHR Movement Tracking</h3>
           <span>Your route through the day on the map, household 1 to 25.</span>
           <span class="mm">${mapped?mapped+' day'+(mapped===1?'':'s')+' with GPS points':'no GPS points yet'}</span></span>
+        <span class="ma">${I.arrow}</span></button>
+      <button class="menu-card" onclick="renderAuto(0)">
+        <span class="mi s">${I.route}</span>
+        <span class="mt"><h3>Automatic GPS Tracking</h3>
+          <span>A point every 5 minutes while the app is open, joined into your track.</span>
+          <span class="mm">${autoOn?'tracking on \u00b7 '+trackPts(currentDay()).length+' point'+(trackPts(currentDay()).length===1?'':'s')+' today'
+             :(trackTotal()?trackTotal()+' point'+(trackTotal()===1?'':'s')+' recorded \u00b7 tracking off':'not started')}</span></span>
         <span class="ma">${I.arrow}</span></button>
       <button class="menu-card" onclick="renderAchv()">
         <span class="mi y">${I.chart}</span>
@@ -1043,6 +1055,248 @@ function drawMap(pts){
     if(line.length>1) lmap.fitBounds(L.latLngBounds(line).pad(0.18));
     else lmap.setView(line[0],17);
     setTimeout(()=>{ try{ lmap.invalidateSize(); }catch(e){} },200);
+  });
+}
+
+
+/* =========================================================
+   AUTOMATIC GPS TRACKING
+   ---------------------------------------------------------
+   A point every five minutes for as long as the app is open, on
+   whichever screen the registrar happens to be. It keeps its own
+   watch, apart from the one the household form uses, so opening a
+   household cannot switch tracking off. Points stay on the device.
+   ========================================================= */
+const AUTO_MS=300000;      /* five minutes between banked points */
+const AUTO_FRESH=120000;   /* a reading older than this is not banked */
+const AUTO_GAP=720000;     /* a hole longer than this is drawn as a gap */
+const DWELL_M=20;          /* points this close together are the same spot */
+let autoWatch=null, autoOn=false, autoFix=null, autoTimer=null, autoLock=null;
+let autoDay=0, amap=null, track={};
+
+function trackKey(){ return 'itn_hhr_track_'+me; }
+function trackOnKey(){ return 'itn_hhr_trackon_'+me; }
+function trackLoad(){ track = me ? Store.get(trackKey(),{}) : {}; }
+function trackSave(){ if(me) Store.set(trackKey(),track); }
+function trackPts(d){ return track['d'+d]||[]; }
+function trackDays(){ const o=[]; for(let d=1;d<=DAYS;d++) if(trackPts(d).length) o.push(d); return o; }
+function trackLast(d){ const a=trackPts(d); return a.length?a[a.length-1]:null; }
+function trackTotal(){ let n=0; for(let d=1;d<=DAYS;d++) n+=trackPts(d).length; return n; }
+function trackBank(f,d){
+  const k='d'+d;
+  if(!track[k]) track[k]=[];
+  track[k].push({lat:f.lat,lng:f.lng,acc:f.acc,t:f.at});
+  trackSave();
+}
+/* Due is measured from the last banked point, never from the timer, so a
+   throttled or suspended page comes back on the right cadence instead of
+   banking a burst of catch-up points. */
+function trackDue(d){
+  const last=trackLast(d);
+  return !last || Date.now()-Date.parse(last.t)>=AUTO_MS;
+}
+function autoTake(p){
+  if(!p||!p.coords) return;
+  autoFix={lat:+p.coords.latitude.toFixed(6), lng:+p.coords.longitude.toFixed(6),
+           acc:Math.round(p.coords.accuracy||0), at:new Date().toISOString()};
+  const d=currentDay();
+  if(autoOn&&trackDue(d)) trackBank(autoFix,d);
+  autoPaint();
+}
+function autoStart(quiet){
+  if(!navigator.geolocation){ toast('This browser has no location support'); return; }
+  autoOn=true; Store.set(trackOnKey(),true);
+  if(autoWatch==null){
+    try{
+      autoWatch=navigator.geolocation.watchPosition(autoTake,
+        e=>{ if(!autoFix&&!quiet) toast(e&&e.code===1?'Tracking needs location permission':'No position yet \u2014 step into the open'); },
+        {enableHighAccuracy:true, timeout:45000, maximumAge:0});
+    }catch(e){}
+  }
+  if(!autoTimer) autoTimer=setInterval(autoTick,15000);
+  wakeOn();
+  if(!quiet) toast('Tracking on \u2014 a point every 5 minutes');
+  autoPaint();
+}
+function autoStop(quiet){
+  autoOn=false; Store.del(trackOnKey());
+  if(autoWatch!=null&&navigator.geolocation&&navigator.geolocation.clearWatch){
+    try{ navigator.geolocation.clearWatch(autoWatch); }catch(e){}
+  }
+  autoWatch=null;
+  if(autoTimer){ clearInterval(autoTimer); autoTimer=null; }
+  wakeOff();
+  if(!quiet) toast('Tracking off');
+  autoPaint();
+}
+/* The safety net: brings the watch back if the browser dropped it, and asks
+   for a one-off position when the watch has gone quiet past the five minutes. */
+function autoTick(){
+  if(!autoOn) return;
+  if(autoWatch==null) autoStart(true);
+  const d=currentDay();
+  if(trackDue(d)){
+    if(autoFix&&Date.now()-Date.parse(autoFix.at)<AUTO_FRESH) trackBank(autoFix,d);
+    else if(navigator.geolocation){
+      try{ navigator.geolocation.getCurrentPosition(autoTake,()=>{},
+        {enableHighAccuracy:false, timeout:30000, maximumAge:60000}); }catch(e){}
+    }
+  }
+  autoPaint();
+}
+/* Holding the screen awake is what makes a five-minute cadence survive a
+   working day: a locked phone suspends the page and tracking stops. */
+function wakeOn(){
+  try{
+    if(!('wakeLock' in navigator)||autoLock) return;
+    navigator.wakeLock.request('screen').then(l=>{
+      autoLock=l; l.addEventListener('release',()=>{ autoLock=null; });
+    }).catch(()=>{});
+  }catch(e){}
+}
+function wakeOff(){ try{ if(autoLock){ autoLock.release(); autoLock=null; } }catch(e){} }
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden&&autoOn) wakeOn(); });
+
+/* Consecutive points within DWELL_M are one stop, drawn as a single dot
+   sized by how long the registrar stood there. */
+function dwellGroups(pts){
+  const out=[];
+  pts.forEach(p=>{
+    const g=out[out.length-1];
+    if(g&&metres(g,p)<=DWELL_M){
+      g.items.push(p);
+      g.lat=g.items.reduce((s,x)=>s+x.lat,0)/g.items.length;
+      g.lng=g.items.reduce((s,x)=>s+x.lng,0)/g.items.length;
+    } else out.push({lat:p.lat,lng:p.lng,items:[p]});
+  });
+  out.forEach(g=>{
+    g.from=g.items[0].t; g.to=g.items[g.items.length-1].t;
+    g.mins=Math.round((Date.parse(g.to)-Date.parse(g.from))/60000);
+  });
+  return out;
+}
+function trackWalk(d){ return pathLength(trackPts(d).map(p=>({lat:p.lat,lng:p.lng}))); }
+function trackSpan(d){
+  const a=trackPts(d); if(a.length<2) return 0;
+  return Date.parse(a[a.length-1].t)-Date.parse(a[0].t);
+}
+const asMins=ms=>{ const m=Math.round(ms/60000); return m<60?m+' min':Math.floor(m/60)+'h '+(m%60)+'m'; };
+
+function autoStatus(){
+  const d=currentDay(), last=trackLast(d), n=trackPts(d).length;
+  const nextIn=last?Math.max(0,AUTO_MS-(Date.now()-Date.parse(last.t))):0;
+  const mmss=ms=>{ const s=Math.round(ms/1000); return Math.floor(s/60)+':'+pad(s%60,2); };
+  const bar = !autoOn
+    ? `<div class="sync-bar off"><span class="d"></span>
+        <div class="t"><b>Tracking is off.</b> Nothing is being recorded.${n?' Day '+d+' has '+n+' point'+(n===1?'':'s')+' from earlier.':''}</div></div>`
+  : last
+    ? `<div class="sync-bar ok"><span class="d"></span>
+        <div class="t"><b>Tracking on \u00b7 ${n} point${n===1?'':'s'} on Day ${d}.</b><br>
+        Last point ${hhmm(last.t)} (\u00b1${last.acc} m) \u00b7 next in ${mmss(nextIn)}</div></div>`
+    : `<div class="sync-bar wait"><span class="d"></span>
+        <div class="t"><b>Tracking on.</b> Looking for the first point\u2026</div></div>`;
+  return `<div id="autoStatus">${bar}
+    <button class="btn ${autoOn?'btn-danger':'btn-ok'} btn-block" onclick="${autoOn?'autoStop()':'autoStart()'}">${autoOn?'Stop tracking':'Start tracking'}</button>
+    <div class="note" style="margin-top:13px">Keep the app open. The screen is held awake while tracking runs. If the phone is locked or another app comes to the front, the browser stops the page and no points are taken until you come back to it.</div>
+  </div>`;
+}
+function autoPaint(){
+  const e=document.getElementById('autoStatus');
+  if(e) e.outerHTML=autoStatus();
+}
+
+function renderAuto(d){
+  const days=trackDays();
+  if(!d) d = days.indexOf(autoDay)>-1?autoDay:(days.length?days[days.length-1]:currentDay());
+  autoDay=d;
+  const pts=trackPts(d), groups=dwellGroups(pts), stops=groups.filter(g=>g.mins>=10);
+  const chips=[];
+  for(let x=1;x<=DAYS;x++){
+    const n=trackPts(x).length;
+    chips.push(`<button class="${x===d?'on':''}" ${(n||x===currentDay())?`onclick="renderAuto(${x})"`:'disabled'}>Day ${x}${n?' \u00b7 '+n:''}</button>`);
+  }
+  app.innerHTML=`<div class="appbar">
+      <button class="ico-btn" onclick="renderMenu()">${I.back}</button>
+      <div class="titles"><div class="eyebrow">${esc(me)} \u00b7 automatic tracking</div><div class="title">Day ${d} track</div></div>
+      <span class="tag-pill me">${pts.length}</span>
+    </div>
+    <div class="body"><div class="list">
+      ${autoStatus()}
+      <div class="daybar">${chips.join('')}</div>
+      ${pts.length?`<div class="stat-grid">
+          <div class="stat"><div class="n">${asDist(trackWalk(d))}</div><div class="l">Distance walked on Day ${d}</div></div>
+          <div class="stat"><div class="n g">${trackSpan(d)?asMins(trackSpan(d)):'\u2014'}</div><div class="l">${hhmm(pts[0].t)} to ${hhmm(pts[pts.length-1].t)}</div></div>
+        </div>`:''}
+      <div id="amap"></div>
+      <div id="amapmsg"></div>
+      ${pts.length?`<div class="legend" style="margin:11px 2px 0">
+          <span><i class="tk"></i>Your track</span><span><i class="tg"></i>Gap in tracking</span>
+          <span><i class="mg"></i>Household registered</span><span><i class="my"></i>Revisit</span></div>
+        <div class="card" style="margin-top:13px">
+          <div class="kv"><span class="k">Points banked</span><span class="v">${pts.length}</span></div>
+          <div class="kv"><span class="k">Separate stops</span><span class="v">${groups.length}</span></div>
+          <div class="kv"><span class="k">Stops of 10 minutes or more</span><span class="v">${stops.length}</span></div>
+          <div class="kv"><span class="k">Households registered that day</span><span class="v">${dayCount(d)} of ${PER_DAY}</span></div>
+        </div>`
+      :`<div class="sync-bar wait" style="margin-top:13px"><span class="d"></span>
+          <div class="t">No track for Day ${d} yet. ${d===currentDay()?'Start tracking above and a point is banked every 5 minutes.':'Tracking was not running on that day.'}</div></div>`}
+    </div></div>`;
+  if(pts.length) drawAuto(d);
+  else { const m=document.getElementById('amap'); if(m) m.style.display='none'; }
+}
+
+function drawAuto(d){
+  const host=document.getElementById('amap');
+  if(!host) return;
+  host.innerHTML=`<div style="height:100%;display:grid;place-items:center"><div class="spin"></div></div>`;
+  withLeaflet(ok=>{
+    const h=document.getElementById('amap');
+    if(!h) return;
+    if(!ok||!window.L){
+      h.style.display='none';
+      const m=document.getElementById('amapmsg');
+      if(m) m.innerHTML=`<div class="sync-bar warn"><span class="d"></span>
+        <div class="t"><b>Map needs internet.</b> The points are safe on the phone and draw as soon as there is a connection.</div>
+        <button class="btn btn-ghost btn-sm" style="flex:0 0 auto" onclick="renderAuto(${d})">Retry</button></div>`;
+      return;
+    }
+    const msg=document.getElementById('amapmsg'); if(msg) msg.innerHTML='';
+    h.innerHTML='';
+    if(amap){ try{ amap.remove(); }catch(e){} amap=null; }
+    amap=L.map(h,{zoomControl:true,attributionControl:true});
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+      {maxZoom:19, attribution:'\u00a9 OpenStreetMap contributors'}).addTo(amap);
+    const groups=dwellGroups(trackPts(d));
+    /* one segment at a time, so a hole in the tracking is dashed rather than
+       drawn as a walk in a straight line the registrar never made */
+    for(let i=1;i<groups.length;i++){
+      const a=groups[i-1], b=groups[i];
+      const gap=Date.parse(b.from)-Date.parse(a.to)>AUTO_GAP;
+      L.polyline([[a.lat,a.lng],[b.lat,b.lng]],
+        {color:gap?'#98adbd':'#5f7f96', weight:gap?2:3, opacity:gap?.7:.85,
+         dashArray:gap?'5 8':null}).addTo(amap);
+    }
+    groups.forEach(g=>{
+      L.circleMarker([g.lat,g.lng],{radius:4+Math.min(9,g.mins/6),color:'#5f7f96',
+        weight:2,fillColor:'#ffffff',fillOpacity:.95}).addTo(amap)
+        .bindPopup(`<div class="mpop"><b>${hhmm(g.from)}${g.mins?'\u2013'+hhmm(g.to):''}</b><br>
+          ${g.items.length} point${g.items.length===1?'':'s'}${g.mins?' \u00b7 stopped ' +g.mins+' min':''}<br>
+          ${g.lat.toFixed(5)}, ${g.lng.toFixed(5)}</div>`);
+    });
+    /* the households sit on top, so the walk and the work read together */
+    const hh=clusterPoints(trackPoints(d));
+    hh.forEach(g=>{
+      const anyRev=g.items.some(p=>p.rev), multi=g.hs.length>1;
+      const w=multi?12+g.label.length*7:26;
+      L.marker([g.lat,g.lng],{icon:L.divIcon({className:'',
+        html:`<div class="mk ${anyRev?'rev':'reg'} ${multi?'multi':''}">${esc(g.label)}</div>`,
+        iconSize:[w,26],iconAnchor:[w/2,13]}),zIndexOffset:1000}).addTo(amap)
+        .bindPopup(`<div class="mpop"><b>Household ${g.hs.join(', ')}</b></div>`);
+    });
+    const all=groups.map(g=>[g.lat,g.lng]).concat(hh.map(g=>[g.lat,g.lng]));
+    if(all.length>1) amap.fitBounds(L.latLngBounds(all).pad(0.18));
+    else amap.setView(all[0],17);
+    setTimeout(()=>{ try{ amap.invalidateSize(); }catch(e){} },200);
   });
 }
 
@@ -1801,7 +2055,10 @@ function submitOne(d,h){
 }
 
 /* ---------- start ---------- */
-if(me&&credsFor(me)){ loadDone(); renderMenu(); autoSync(); } else { me=null; renderDistricts(); }
+if(me&&credsFor(me)){
+  loadDone(); renderMenu(); autoSync();
+  if(Store.get(trackOnKey(),false)) autoStart(true);   /* a reload costs a gap, not the day */
+} else { me=null; renderDistricts(); }
 </script>
 </body>
 </html>
